@@ -1,0 +1,5 @@
+{
+  "name": "GitHub SSH private repos",
+  "install": "chmod +x scripts/setup-github-ssh.sh && ssh -V",
+  "start": "./scripts/setup-github-ssh.sh"
+}
