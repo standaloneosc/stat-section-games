@@ -1,5 +1,5 @@
 import { getLocalDestinations, getNeighborPositions } from "./neighbors";
-import { posKey } from "./positions";
+import { directionLabel, parsePosKey, posKey } from "./positions";
 import { alertMoodLine } from "./story";
 import type { MonsterTrait, MovementMode, Position, RoundConfig } from "./types";
 import { CENTER, PROBABILITY_TOLERANCE } from "./types";
@@ -123,6 +123,27 @@ export function huntCenterWeights(
     weights[key] = key === centerKey ? 1.5 * otherCount : 1;
   }
   return normalizeDistribution(weights);
+}
+
+export type AlertHabit = {
+  key: string;
+  label: string;
+  probability: number;
+};
+
+export function alertHabits(
+  position: Position,
+  trait: MonsterTrait,
+  gridSize: number
+): AlertHabit[] {
+  const weights = huntCenterWeights(position, trait, gridSize);
+  return Object.entries(weights)
+    .map(([key, probability]) => ({
+      key,
+      label: directionLabel(position, parsePosKey(key)),
+      probability,
+    }))
+    .sort((a, b) => b.probability - a.probability || a.label.localeCompare(b.label));
 }
 
 function modeLabel(id: string, fallback?: string): string {

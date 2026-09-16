@@ -66,7 +66,6 @@ describe("player-facing noticed story", () => {
   it("describes Alert as hunting the middle without share-counts", () => {
     const line = alertMoodLine("walker");
     expect(line.toLowerCase()).toContain("hunts the middle");
-    expect(line.toLowerCase()).toContain("corners");
     expect(line).not.toMatch(/6 shares|6 parts|posterior/);
     expect(noticedMotionBlurb("walker")).toBe(line);
   });

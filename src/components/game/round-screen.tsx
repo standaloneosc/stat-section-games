@@ -10,7 +10,7 @@ import { Label } from "@/components/ui/label";
 import type { PublicRoomState } from "@/lib/game";
 import { formatPosition } from "@/lib/probability";
 import { GameBoard, squareLabel, traitLabel } from "./board";
-import { HelpPanel, MovementTable, ClueFactsCard, MoodsCard, TimerBar } from "./panels";
+import { HelpPanel, MovementTable, ClueFactsCard, MoodsCard, AlertHabitsTable, TimerBar } from "./panels";
 
 export function RoundScreen(props: {
   state: PublicRoomState;
@@ -199,7 +199,16 @@ export function RoundScreen(props: {
           trait={round.monster.trait}
           bayes={bayes}
         />
-        <Card>
+        {bayes ? (
+          <AlertHabitsTable
+            currentPosition={round.monster.currentPosition}
+            trait={round.monster.trait}
+            gridSize={round.gridSize}
+          />
+        ) : null}
+      </div>
+
+      <Card>
           <CardHeader>
             <CardTitle>Your hide</CardTitle>
             <CardDescription>Selected square: {selectedLabel}.</CardDescription>
@@ -245,7 +254,6 @@ export function RoundScreen(props: {
             </Button>
           </CardContent>
         </Card>
-      </div>
 
       <HelpPanel bayes={bayes} />
     </div>

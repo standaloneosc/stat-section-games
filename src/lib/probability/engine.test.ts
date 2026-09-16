@@ -9,6 +9,7 @@ import {
   createSeededRandom,
   destinationWeightsForMode,
   directionLabel,
+  alertHabits,
   explanationForRound,
   formatPercent,
   getLegalSquares,
@@ -147,6 +148,18 @@ describe("Bayes example", () => {
     expect(weights["1,1"]).toBeCloseTo(0.6, 10);
     expect(weights["0,1"]).toBeCloseTo(0.1, 10);
     expect(weights["0,0"]).toBeUndefined();
+  });
+
+  it("lists Alert habits as Stay 60% and 10% each side, not mixed hit answers", () => {
+    const habits = alertHabits({ x: 1, y: 1 }, "walker", 3);
+    expect(habits.map((row) => row.label).sort()).toEqual(["Down", "Left", "Right", "Stay", "Up"].sort());
+    expect(habits.find((row) => row.label === "Stay")?.probability).toBeCloseTo(0.6, 10);
+    expect(habits.filter((row) => row.label !== "Stay").every((row) => Math.abs(row.probability - 0.1) < 1e-9)).toBe(
+      true
+    );
+    const json = JSON.stringify(habits);
+    expect(json).not.toContain("0.19");
+    expect(json).not.toContain("0.24");
   });
 
   it("keeps five Walker squares when a notice hint is on, and the warning raises P(center)", () => {

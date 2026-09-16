@@ -57,7 +57,7 @@ Round 1 is a Walker in the **center** `(1,1)` — five legal squares (stay plus 
 | Vertical | 30% | up or down, equally |
 | Wander | 20% | stay or any orthogonal neighbor, equally |
 
-Students add those modes themselves (LOTP). Teachers can check against `P(left) = 0.19` and `P(center) = 0.24` after lock-in — those answers are not printed on the player board.
+Students add those Calm modes themselves (LOTP). If Alert (angry), the Walker hunts the middle on the same five squares: Stay 60%, each side 10%. Those are P(square | Alert), not P(hit | clue). Students mix Alert vs Calm after Bayes. Teachers can check mixed hit answers (`P(left) = 0.19` Calm-only, or the posterior mix) after lock-in — those answers are not printed on the player board.
 
 Every round has two hidden moods unless the host turns the clue off:
 

@@ -64,14 +64,14 @@ export function clueJobLine(clueId: string | null | undefined): string {
 
 export function alertMoodLine(trait: MonsterTrait): string {
   if (trait === "walker") {
-    return "It hunts the middle. It still only stays or steps to a side — corners stay out of range. The center is the most likely square; the four sides split the leftover equally.";
+    return "It hunts the middle on the same legal squares (no corners). Use the Alert table.";
   }
   if (trait === "spider") {
-    return "It hunts the middle and may step diagonally. The center is the most likely legal square; the others split the leftover equally.";
+    return "It hunts the middle and may step diagonally. Use the Alert table.";
   }
-  return "It hunts the middle. The center is the most likely legal square when it is in range; the others split the leftover equally.";
+  return "It hunts the middle when that square is in range. Use the Alert table.";
 }
 
 export function calmMoodLine(): string {
-  return "It mixes the habits in the table: stay, side steps, or wander.";
+  return "It mixes stay, side steps, or wander. Use the Calm table.";
 }

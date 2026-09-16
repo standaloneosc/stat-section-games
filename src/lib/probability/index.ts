@@ -30,6 +30,7 @@ export {
   huntCenterWeights,
   noticedMotionBlurb,
   normalizeDistribution,
+  alertHabits,
 } from "./movement";
 export {
   calculateBayesPosterior,

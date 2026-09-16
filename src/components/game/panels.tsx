@@ -11,6 +11,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import {
+  alertHabits,
   alertMoodLine,
   calmMoodLine,
   clueJobLine,
@@ -20,6 +21,7 @@ import {
   formatPercent,
   type MonsterTrait,
   type MovementMode,
+  type Position,
 } from "@/lib/probability";
 
 export function TimerBar(props: {
@@ -64,10 +66,10 @@ export function MovementTable(props: {
   return (
     <Card>
       <CardHeader>
-        <CardTitle>{props.bayes ? "Calm mood — did not notice you" : "Movement habits"}</CardTitle>
+        <CardTitle>{props.bayes ? "Calm — did not notice you" : "Movement habits"}</CardTitle>
         <CardDescription>
           {props.bayes
-            ? "If it is calm, mix these habits. The percents are how often each habit happens, not the hit chance of a square."
+            ? "If it is Calm, mix these habits. These percents are not P(hit | clue)."
             : "Mix these habits. The percents are how often each habit happens, not the hit chance of a square."}
         </CardDescription>
       </CardHeader>
@@ -95,6 +97,43 @@ export function MovementTable(props: {
   );
 }
 
+export function AlertHabitsTable(props: {
+  currentPosition: Position;
+  trait: MonsterTrait;
+  gridSize?: number;
+}) {
+  const rows = alertHabits(props.currentPosition, props.trait, props.gridSize ?? 3);
+  return (
+    <Card className="border-rose-400/30">
+      <CardHeader>
+        <CardTitle>Alert (angry) — hunts the middle</CardTitle>
+        <CardDescription>
+          Same legal squares as Calm. These percents are P(square | Alert), not the hit chance after
+          Bayes.
+        </CardDescription>
+      </CardHeader>
+      <CardContent>
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead>Square</TableHead>
+              <TableHead>How often if Alert</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {rows.map((row) => (
+              <TableRow key={row.key}>
+                <TableCell className="font-medium">{row.label}</TableCell>
+                <TableCell className="font-mono">{formatPercent(row.probability)}</TableCell>
+              </TableRow>
+            ))}
+          </TableBody>
+        </Table>
+      </CardContent>
+    </Card>
+  );
+}
+
 export function MoodsCard(props: { trait: MonsterTrait }) {
   return (
     <Card>
@@ -107,7 +146,7 @@ export function MoodsCard(props: { trait: MonsterTrait }) {
       <CardContent>
         <div className="grid gap-2 sm:grid-cols-2">
           <div className="rounded-lg bg-rose-500/15 p-3 text-sm leading-6">
-            <p className="font-semibold text-rose-100">Alert — noticed the class</p>
+            <p className="font-semibold text-rose-100">Alert (angry) — noticed the class</p>
             <p className="text-muted-foreground">{alertMoodLine(props.trait)}</p>
           </div>
           <div className="rounded-lg bg-emerald-500/15 p-3 text-sm leading-6">
@@ -171,8 +210,8 @@ export function HelpPanel(props: { bayes?: boolean }) {
         {props.bayes ? (
           <p>
             <span className="font-medium text-foreground">Clue first.</span> The light (or the
-            quiet) updates how likely Alert is. That is Bayes. Then mix Alert movement with Calm
-            movement using your updated number.
+            quiet) updates how likely Alert is. That is Bayes. Then mix the Alert table with the
+            Calm table using your updated number.
           </p>
         ) : (
           <p>
