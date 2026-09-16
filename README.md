@@ -33,7 +33,7 @@ Create room works without client JavaScript: the form posts to `/api/rooms` and 
 
 1. Open `/room/CODE` in another tab (or Join from home).
 2. Enter a display name.
-3. When the round starts, read the clue (red warning light or all quiet).
+3. When the round starts, look at the lightbulb (on = warning, off = quiet).
 4. Update how likely the monster noticed the class, pick a highlighted legal square, and estimate the hit chance. Corners are off for a Walker in the center.
 5. Enter percents (type `20` for 20%, not `0.20`).
 6. Lock in before the timer ends. Late players get a random legal square and no probability bonus.
@@ -64,7 +64,7 @@ Every round has two hidden moods unless the host turns the clue off:
 - **Alert** — it noticed the class and hunts the middle
 - **Calm** — it did not notice you and mixes Stay / Horizontal / Vertical / Wander
 
-The clue is something students can see: a red warning light, or all quiet. World facts they can plug into Bayes: it notices the class 40% of the time; a warning happens 80% of the time when Alert and 20% of the time when Calm. They calculate P(Alert | clue), then P(hit this square). The player board does not print the posterior or the true hit percents.
+The observation is a large lightbulb: on is a warning, off is quiet. Bayes facts sit next to it (notices 40% before any clue; 80%/20% for light on given Alert vs Calm). They calculate P(Alert | this clue), then P(hit this square). The player board does not print the posterior or the true hit percents.
 
 ## Scoring
 

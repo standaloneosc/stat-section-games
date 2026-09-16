@@ -15,7 +15,6 @@ import {
   alertMoodLine,
   calmMoodLine,
   clueJobLine,
-  clueSight,
   clueWorldFacts,
   describeModeMotion,
   formatPercent,
@@ -23,6 +22,7 @@ import {
   type MovementMode,
   type Position,
 } from "@/lib/probability";
+import { ClueLightbulb } from "./clue-lightbulb";
 
 export function TimerBar(props: {
   remainingMs: number;
@@ -166,7 +166,6 @@ export function ClueFactsCard(props: {
   likelihoodIfNotNoticed: number | null;
 }) {
   const warning = props.clueId === "warning";
-  const sight = clueSight(props.clueId);
   const facts = clueWorldFacts({
     priorNoticed: props.priorNoticed,
     likelihoodIfNoticed: props.likelihoodIfNoticed,
@@ -175,25 +174,23 @@ export function ClueFactsCard(props: {
   });
 
   return (
-    <Card className="border-amber-300/30">
-      <CardHeader className="pb-3">
-        <CardTitle>The clue</CardTitle>
-        <CardDescription>Facts about this clue — not the answers.</CardDescription>
-      </CardHeader>
-      <CardContent className="space-y-3 text-sm leading-6">
-        <div className="rounded-lg border border-amber-300/40 bg-amber-500/10 p-3">
-          <p className="text-xs tracking-wide text-amber-200 uppercase">What you can see</p>
-          <p className="text-lg font-semibold text-foreground">{sight.title}</p>
-          <p>{sight.seen}</p>
-        </div>
-        <ul className="list-disc space-y-1 pl-5">
-          {facts.map((fact) => (
-            <li key={fact}>{fact}</li>
-          ))}
-        </ul>
-        <p className="text-muted-foreground">{clueJobLine(props.clueId)}</p>
-      </CardContent>
-    </Card>
+    <div className="space-y-4">
+      <ClueLightbulb on={warning} />
+      <Card className="border-amber-300/30">
+        <CardHeader className="pb-3">
+          <CardTitle>Bayes facts</CardTitle>
+          <CardDescription>Numbers that feed the update — not the answers.</CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-3 text-sm leading-6">
+          <ul className="list-disc space-y-1 pl-5">
+            {facts.map((fact) => (
+              <li key={fact}>{fact}</li>
+            ))}
+          </ul>
+          <p className="text-muted-foreground">{clueJobLine()}</p>
+        </CardContent>
+      </Card>
+    </div>
   );
 }
 
@@ -209,9 +206,9 @@ export function HelpPanel(props: { bayes?: boolean }) {
       <CardContent className="space-y-3 text-sm leading-6 text-muted-foreground">
         {props.bayes ? (
           <p>
-            <span className="font-medium text-foreground">Clue first.</span> The light (or the
-            quiet) updates how likely Alert is. That is Bayes. Then mix the Alert table with the
-            Calm table using your updated number.
+            <span className="font-medium text-foreground">Light first.</span> On is a warning this
+            round; off is quiet. Use that to find P(Alert | this clue), then mix the Alert table
+            with the Calm table.
           </p>
         ) : (
           <p>

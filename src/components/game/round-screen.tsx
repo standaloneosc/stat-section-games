@@ -115,7 +115,7 @@ export function RoundScreen(props: {
           <Badge>{traitLabel(round.monster.trait)}</Badge>
           {bayes ? (
             <Badge variant="secondary">
-              {round.bayes.clueId === "quiet" ? "All quiet" : "Warning light"}
+              {round.bayes.clueId === "quiet" ? "Light off" : "Light on"}
             </Badge>
           ) : (
             <Badge variant="outline">No clue this round</Badge>
@@ -165,7 +165,7 @@ export function RoundScreen(props: {
             <CardContent className="space-y-1 text-sm leading-6">
               {bayes ? (
                 <>
-                  <p>1. Read the clue.</p>
+                  <p>1. Look at the light.</p>
                   <p>2. Update how likely it noticed the class.</p>
                   <p>3. Pick a square.</p>
                   <p>4. Estimate the hit chance.</p>

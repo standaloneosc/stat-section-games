@@ -32,34 +32,31 @@ export function clueWorldFacts(options: {
   const facts: string[] = [];
   if (options.priorNoticed !== null) {
     facts.push(
-      `Before any clue, the monster notices the class ${asPercent(options.priorNoticed)} of the time.`
+      `The monster notices the class ${asPercent(options.priorNoticed)} of the time (before any clue).`
     );
   }
   if (options.likelihoodIfNoticed !== null && options.likelihoodIfNotNoticed !== null) {
     if (options.warning) {
       facts.push(
-        `When it noticed the class, a warning light happens ${asPercent(options.likelihoodIfNoticed)} of the time.`
+        `If Alert, the light is on ${asPercent(options.likelihoodIfNoticed)} of the time.`
       );
       facts.push(
-        `When it did not notice you, a warning light still happens ${asPercent(options.likelihoodIfNotNoticed)} of the time (a false alarm).`
+        `If Calm, the light is on ${asPercent(options.likelihoodIfNotNoticed)} of the time.`
       );
     } else {
       facts.push(
-        `When it noticed the class, the sensors stay quiet ${asPercent(1 - options.likelihoodIfNoticed)} of the time.`
+        `If Alert, the light is off ${asPercent(1 - options.likelihoodIfNoticed)} of the time.`
       );
       facts.push(
-        `When it did not notice you, the sensors stay quiet ${asPercent(1 - options.likelihoodIfNotNoticed)} of the time.`
+        `If Calm, the light is off ${asPercent(1 - options.likelihoodIfNotNoticed)} of the time.`
       );
     }
   }
   return facts;
 }
 
-export function clueJobLine(clueId: string | null | undefined): string {
-  if (clueId === "quiet") {
-    return "You are calculating two things. First: given All quiet, how likely the monster noticed the class — P(Alert | All quiet). Then use that to get P(hit this square).";
-  }
-  return "You are calculating two things. First: given the red warning light, how likely the monster noticed the class — P(Alert | warning light). Then use that to get P(hit this square).";
+export function clueJobLine(_clueId?: string | null): string {
+  return "You are calculating P(Alert | this clue), then P(hit this square).";
 }
 
 export function alertMoodLine(trait: MonsterTrait): string {

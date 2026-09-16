@@ -3,7 +3,6 @@ import {
   alertMoodLine,
   asPercent,
   clueJobLine,
-  clueSight,
   clueWorldFacts,
   noticedMotionBlurb,
 } from "./index";
@@ -15,14 +14,7 @@ describe("player-facing noticed story", () => {
     expect(asPercent(0.2)).toBe("20%");
   });
 
-  it("makes the warning light something you can see", () => {
-    const sight = clueSight("warning");
-    expect(sight.title).toBe("Red warning light");
-    expect(sight.seen.toLowerCase()).toContain("red warning light");
-    expect(sight.seen.toLowerCase()).not.toContain("posterior");
-  });
-
-  it("gives warning-light Bayes inputs as percents, not the posterior", () => {
+  it("gives warning (light on) Bayes inputs as percents, not the posterior", () => {
     const facts = clueWorldFacts({
       priorNoticed: 0.4,
       likelihoodIfNoticed: 0.8,
@@ -30,14 +22,14 @@ describe("player-facing noticed story", () => {
       warning: true,
     });
     expect(facts).toEqual([
-      "Before any clue, the monster notices the class 40% of the time.",
-      "When it noticed the class, a warning light happens 80% of the time.",
-      "When it did not notice you, a warning light still happens 20% of the time (a false alarm).",
+      "The monster notices the class 40% of the time (before any clue).",
+      "If Alert, the light is on 80% of the time.",
+      "If Calm, the light is on 20% of the time.",
     ]);
-    expect(facts.join(" ")).not.toMatch(/14%|29%|18%|72|0\.727|posterior|times out of 100/);
+    expect(facts.join(" ")).not.toMatch(/14%|29%|18%|72|0\.727|posterior|sensors stayed/);
   });
 
-  it("gives all-quiet Bayes inputs as percents, not the posterior", () => {
+  it("gives quiet (light off) Bayes inputs as percents, not the posterior", () => {
     const facts = clueWorldFacts({
       priorNoticed: 0.4,
       likelihoodIfNoticed: 0.8,
@@ -45,22 +37,18 @@ describe("player-facing noticed story", () => {
       warning: false,
     });
     expect(facts).toEqual([
-      "Before any clue, the monster notices the class 40% of the time.",
-      "When it noticed the class, the sensors stay quiet 20% of the time.",
-      "When it did not notice you, the sensors stay quiet 80% of the time.",
+      "The monster notices the class 40% of the time (before any clue).",
+      "If Alert, the light is off 20% of the time.",
+      "If Calm, the light is off 80% of the time.",
     ]);
-    expect(facts.join(" ")).not.toMatch(/14%|29%|18%|times out of 100/);
+    expect(facts.join(" ")).not.toMatch(/14%|29%|18%|you can see/i);
   });
 
-  it("names the two calculation targets for each clue", () => {
-    expect(clueJobLine("quiet")).toBe(
-      "You are calculating two things. First: given All quiet, how likely the monster noticed the class — P(Alert | All quiet). Then use that to get P(hit this square)."
+  it("names the two calculation targets without spoiling answers", () => {
+    expect(clueJobLine()).toBe(
+      "You are calculating P(Alert | this clue), then P(hit this square)."
     );
-    expect(clueJobLine("warning")).toBe(
-      "You are calculating two things. First: given the red warning light, how likely the monster noticed the class — P(Alert | warning light). Then use that to get P(hit this square)."
-    );
-    expect(clueJobLine("quiet")).not.toMatch(/14%|29%|18%/);
-    expect(clueJobLine("warning")).not.toMatch(/14%|29%|18%/);
+    expect(clueJobLine()).not.toMatch(/14%|29%|18%/);
   });
 
   it("describes Alert as hunting the middle without share-counts", () => {
