@@ -1,51 +1,69 @@
-# GitHub SSH for private repos
+# Hide & Seek Probability
 
-Cloud Agent environment that authenticates to GitHub over SSH so agents can clone and pull private repositories (`git@github.com:...`).
+A local classroom game for teaching **conditional probability**, the **law of total probability**, and **Bayes' rule**. Players hide on a 3×3 board while one monster moves according to a public trait. Survival points are split with anyone who hid on the same square.
 
-## How it works
+This is a Next.js app with a server-authoritative in-memory room. Open it on a laptop, then join from other browser tabs. There are no accounts, no matchmaking, and no production deploy in this slice.
 
-1. You add a private key as the Cursor secret `GITHUB_SSH_PRIVATE_KEY`.
-2. You add the matching public key to your GitHub account (or as a deploy key on specific private repos).
-3. On every agent boot, `scripts/setup-github-ssh.sh` writes the key to `~/.ssh` and verifies `git@github.com` auth.
-
-The primary workspace checkout still uses Cursor’s GitHub App connection. SSH is for agent-driven clones: private dependencies, submodules, sibling repos, and `git@github.com` remotes.
-
-## One-time setup
-
-### 1. Create an SSH key (if you do not already have one)
+## Run locally
 
 ```bash
-ssh-keygen -t ed25519 -C "cursor-cloud-agent" -f ./cursor-github -N ""
+npm install
+npm test
+npm run dev
 ```
 
-### 2. Add the public key to GitHub
+Then open [http://127.0.0.1:43147](http://127.0.0.1:43147). The dev server binds `0.0.0.0` on port **43147**.
 
-- Account-wide: [GitHub → Settings → SSH and GPG keys](https://github.com/settings/keys) → New SSH key → paste `cursor-github.pub`
-- Or per-repo: repository Settings → Deploy keys → add `cursor-github.pub` (read-only is enough for clones)
+## How to play
 
-### 3. Add the private key as a Cursor secret
+### Host / teacher
 
-1. Open [Cloud Agents secrets](https://cursor.com/dashboard/cloud-agents)
-2. Add secret name: `GITHUB_SSH_PRIVATE_KEY`
-3. Value: full contents of the private key file (`cursor-github`), including the `BEGIN` / `END` lines  
-   (base64-encoding the file is also supported)
-4. Prefer **Runtime Secret** so the key is redacted from transcripts
+1. Click **Create room** on the home page.
+2. Share the four-character code or `/room/CODE` link.
+3. Optionally set round length (default 240 seconds), trait, Bayes, hints, and leaderboard.
+4. Use **Demo timing (45s)** before starting if you do not want a four-minute decision window.
+5. **Start game**, then **Pause**, **Resume**, **End round now**, **Next round**, or **End game**.
+6. Keep the host tab on `/room/CODE/host`. Host controls stay on the browser that created the room.
 
-### 4. Save this environment
+### Players
 
-After the agent validates setup, click **Save** in the Environment panel so future agents reuse it.
+1. Open `/room/CODE` in another tab (or Join from home).
+2. Enter a display name.
+3. When the round starts, pick a highlighted legal square.
+4. Enter the hit probability as a **percent** (type `19` for 19%, not `0.19`).
+5. On Bayes rounds, also enter `P(noticed | clue)`.
+6. Lock in before the timer ends. Late players get a random legal square and no probability bonus.
 
-## Local / agent verification
+Player counts and other people's squares stay hidden until the results screen.
+
+### Practice
+
+`/practice` is a single-player version of the same math. Turn on hints to see true probabilities before you submit. Bayes practice uses a Hunter and a hidden noticed-players state.
+
+## What the first round looks like
+
+Round 1 is the spec's Walker-in-the-center example:
+
+- stay 0.20, horizontal 0.30, vertical 0.30, random local 0.20
+- `P(left) = 0.19`, `P(center) = 0.24`
+- corners are disabled because they have probability 0
+
+Every third round is a Bayes challenge (Hunter, hidden `noticedPlayers`, warning/quiet clue) unless the host turns Bayes off.
+
+## Scoring
+
+- Survival: `100 / (1 + other players on your square)` if you live, otherwise 0
+- Probability bonus: up to 20 points for closeness to the true hit probability, even if you are caught
+- Bayes bonus: the same closeness rule on `P(noticed | clue)`
+
+## Tests
 
 ```bash
-./scripts/setup-github-ssh.sh
-ssh -T git@github.com
-# Expect: Hi <username>! You've successfully authenticated...
-git ls-remote git@github.com:<org>/<private-repo>.git HEAD
+npm test
 ```
+
+Covers neighbor generation, LOTP 0.19, Bayes 0.7273, edge renormalization, congestion payouts, calibration bonuses, hidden information before resolution, late submissions, and reconnect.
 
 ## Notes
 
-- Never commit private keys. Keep them only in Cursor secrets.
-- For repos the Cursor GitHub App already can access, HTTPS + App token is often enough; use SSH when you specifically need `git@github.com` remotes.
-- To expand App-token scope for HTTPS clones of extra repos, use `repositoryDependencies` in `.cursor/environment.json` (`github.com/org/repo` form) and grant the App access to those repos.
+Rooms live in the Node process memory. Restarting the dev server empties rooms. That is enough for a class on one machine; it is not a hosted service.
