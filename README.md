@@ -22,10 +22,10 @@ Then open [http://127.0.0.1:43147](http://127.0.0.1:43147). Production (`npm sta
 
 1. Click **Create room** on the home page.
 2. Share the four-character code or `/room/CODE` link.
-3. Optionally set round length (default 240 seconds), trait, Bayes, spoiler percents, and leaderboard.
+3. Optionally set round length (default 240 seconds), trait, Bayes, **Alert percents** (default P(Alert) 40%, P(warning | Alert) 80%, P(warning | Calm) 20%), spoiler percents, and leaderboard.
 4. Use **Demo timing (45s)** before starting if you do not want a four-minute decision window.
 5. **Start game**, then **Pause**, **Resume**, **End round now**, **Next round**, or **End game**.
-6. Keep the host tab on `/room/CODE/host`. Host controls stay on the browser that created the room.
+6. Keep the host tab on `/room/CODE/host`. Host controls stay on the browser that created the room. Alert percents live in **Classroom rules** on that page and can be changed for the upcoming round, or the current round while students are still choosing.
 
 Create room works without client JavaScript: the form posts to `/api/rooms` and sets a host cookie.
 
@@ -44,7 +44,7 @@ Player counts and other people's squares stay hidden until the results screen.
 
 ### Practice
 
-`/practice` is a single-player version of the same math. Leave true hit percents off to work by hand. The clue / two moods switch is on by default.
+`/practice` is a single-player version of the same math. Leave true hit percents off to work by hand. The clue / two moods switch is on by default. Round setup has the same Alert percent fields as the host desk.
 
 ## What the first round looks like
 
@@ -64,7 +64,7 @@ Every round has two hidden moods unless the host turns the clue off:
 - **Alert** — it noticed the class and hunts the middle
 - **Calm** — it did not notice you and mixes Stay / Horizontal / Vertical / Wander
 
-The observation is a large lightbulb: on is a warning, off is quiet. Bayes facts sit next to it (notices 40% before any clue; 80%/20% for light on given Alert vs Calm). They calculate P(Alert | this clue), then P(hit this square). The player board does not print the posterior or the true hit percents.
+The observation is a large lightbulb: on is a warning, off is quiet. Bayes facts sit next to it and show the **current** host percents (default notices 40% before any clue; 80%/20% for light on given Alert vs Calm). They calculate P(Alert | this clue), then P(hit this square). The player board does not print the posterior or the true hit percents.
 
 ## Scoring
 

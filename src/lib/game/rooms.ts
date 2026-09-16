@@ -1,4 +1,5 @@
 import {
+  bayesLikelihoodsAreUsable,
   buildTraitMovementModes,
   calculateProbabilityBonus,
   calculateSurvivalReward,
@@ -19,6 +20,10 @@ import {
   type Position,
   type RoundConfig,
 } from "@/lib/probability";
+import {
+  parseUnitInterval,
+  UNUSABLE_BAYES_MESSAGE,
+} from "./bayes-percents";
 import {
   DEFAULT_GAME_CONFIG,
   type GameConfig,
@@ -118,7 +123,7 @@ export function createRoom(options: {
     hostId,
     hostToken,
     createdAt: nowIso(),
-    config: { ...DEFAULT_GAME_CONFIG, ...options.config },
+    config: normalizeConfig({ ...DEFAULT_GAME_CONFIG, ...options.config }),
     status: "lobby",
     players: new Map(),
     round: null,
@@ -199,15 +204,43 @@ export function assertPlayer(room: Room, playerId: string, token: string): Playe
 
 export function updateConfig(room: Room, hostToken: string, patch: Partial<GameConfig>): GameConfig {
   assertHost(room, hostToken);
+  const next = normalizeConfig({ ...room.config, ...patch });
   if (room.status === "playing" || room.status === "paused") {
-    throw new GameError("Pause and return to the lobby before changing rules.", 409);
+    if (JSON.stringify(configWithoutBayes(next)) !== JSON.stringify(configWithoutBayes(room.config))) {
+      throw new GameError(
+        "Pause and return to the lobby before changing other rules. You can still change Alert/Bayes percents for this round.",
+        409
+      );
+    }
+    room.config = next;
+    applyBayesPercentsToCurrentRound(room);
+    broadcastState(room);
+    return room.config;
   }
-  room.config = normalizeConfig({ ...room.config, ...patch });
+  room.config = next;
   broadcastState(room);
   return room.config;
 }
 
-function normalizeConfig(config: GameConfig): GameConfig {
+export function normalizeConfig(config: GameConfig): GameConfig {
+  const priorNoticed = requireUnitInterval(config.priorNoticed, "P(Alert)");
+  const warningLikelihoodIfNoticed = requireUnitInterval(
+    config.warningLikelihoodIfNoticed,
+    "P(warning | Alert)"
+  );
+  const warningLikelihoodIfNotNoticed = requireUnitInterval(
+    config.warningLikelihoodIfNotNoticed,
+    "P(warning | Calm)"
+  );
+  if (
+    !bayesLikelihoodsAreUsable(
+      priorNoticed,
+      warningLikelihoodIfNoticed,
+      warningLikelihoodIfNotNoticed
+    )
+  ) {
+    throw new GameError(UNUSABLE_BAYES_MESSAGE, 400);
+  }
   return {
     ...config,
     gridSize: 3,
@@ -216,21 +249,49 @@ function normalizeConfig(config: GameConfig): GameConfig {
     resultsDurationSeconds: clampInt(config.resultsDurationSeconds, 10, 180),
     baseReward: clampInt(config.baseReward, 10, 1000),
     bayesEveryNthRound: clampInt(config.bayesEveryNthRound, 1, 12),
-    priorNoticed: clampProb(config.priorNoticed),
-    warningLikelihoodIfNoticed: clampProb(config.warningLikelihoodIfNoticed),
-    warningLikelihoodIfNotNoticed: clampProb(config.warningLikelihoodIfNotNoticed),
+    priorNoticed,
+    warningLikelihoodIfNoticed,
+    warningLikelihoodIfNotNoticed,
   };
+}
+
+function requireUnitInterval(value: number, label: string): number {
+  try {
+    return parseUnitInterval(value, label);
+  } catch (error) {
+    throw new GameError(
+      error instanceof Error ? error.message : `${label} must be between 0 and 100.`,
+      400
+    );
+  }
+}
+
+function configWithoutBayes(config: GameConfig) {
+  const {
+    priorNoticed,
+    warningLikelihoodIfNoticed,
+    warningLikelihoodIfNotNoticed,
+    ...rest
+  } = config;
+  void priorNoticed;
+  void warningLikelihoodIfNoticed;
+  void warningLikelihoodIfNotNoticed;
+  return rest;
+}
+
+function applyBayesPercentsToCurrentRound(room: Room): void {
+  const round = room.round;
+  if (!round || !round.bayes.enabled || round.phase !== "choosing") {
+    return;
+  }
+  round.bayes.priorNoticed = room.config.priorNoticed;
+  round.bayes.clueLikelihoodIfNoticed = room.config.warningLikelihoodIfNoticed;
+  round.bayes.clueLikelihoodIfNotNoticed = room.config.warningLikelihoodIfNotNoticed;
+  round.correctHitProbabilities = getCorrectHitProbabilities(toRoundConfig(round));
 }
 
 function clampInt(value: number, min: number, max: number): number {
   return Math.min(max, Math.max(min, Math.round(value)));
-}
-
-function clampProb(value: number): number {
-  if (!Number.isFinite(value)) {
-    return 0;
-  }
-  return Math.min(1, Math.max(0, value));
 }
 
 export function startGame(room: Room, hostToken: string): void {
@@ -332,6 +393,7 @@ export function createInternalRound(
   roundNumber: number,
   rng: () => number = Math.random
 ): InternalRound {
+  config = normalizeConfig(config);
   const bayesRound = Boolean(config.bayesEnabled);
   const trait = pickTrait(config, roundNumber);
   let lastError: unknown = null;
@@ -859,11 +921,14 @@ export function createPracticeRound(options: {
   hintsEnabled?: boolean;
   bayes?: boolean;
   trait?: MonsterTrait | "auto";
+  priorNoticed?: number;
+  warningLikelihoodIfNoticed?: number;
+  warningLikelihoodIfNotNoticed?: number;
 }): {
   practiceId: string;
   state: PublicRoomState;
 } {
-  const config: GameConfig = {
+  const config = normalizeConfig({
     ...DEFAULT_GAME_CONFIG,
     roundCount: 1,
     hintsEnabled: options.hintsEnabled ?? false,
@@ -871,7 +936,13 @@ export function createPracticeRound(options: {
     bayesEveryNthRound: 1,
     monsterTrait: options.trait ?? "walker",
     showLeaderboard: false,
-  };
+    priorNoticed: options.priorNoticed ?? DEFAULT_GAME_CONFIG.priorNoticed,
+    warningLikelihoodIfNoticed:
+      options.warningLikelihoodIfNoticed ?? DEFAULT_GAME_CONFIG.warningLikelihoodIfNoticed,
+    warningLikelihoodIfNotNoticed:
+      options.warningLikelihoodIfNotNoticed ??
+      DEFAULT_GAME_CONFIG.warningLikelihoodIfNotNoticed,
+  });
   const roundNumber = config.bayesEnabled ? config.bayesEveryNthRound : 1;
   const round = createInternalRound(config, roundNumber);
   const practiceId = randomId();

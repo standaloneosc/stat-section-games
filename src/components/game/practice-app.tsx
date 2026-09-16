@@ -5,8 +5,14 @@ import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Switch } from "@/components/ui/switch";
+import { bayesPercentError } from "@/lib/game/bayes-percents";
 import type { PublicRoomState } from "@/lib/game";
 import type { MonsterTrait } from "@/lib/probability";
+import {
+  BayesPercentFields,
+  DEFAULT_BAYES_PERCENTS,
+  type BayesPercentValues,
+} from "./bayes-percent-fields";
 import { ResultsScreen } from "./results-screen";
 import { RoundScreen } from "./round-screen";
 
@@ -14,19 +20,39 @@ export function PracticeApp() {
   const [hints, setHints] = useState(false);
   const [bayes, setBayes] = useState(true);
   const [trait, setTrait] = useState<MonsterTrait | "auto">("walker");
+  const [percents, setPercents] = useState<BayesPercentValues>(DEFAULT_BAYES_PERCENTS);
+  const [percentError, setPercentError] = useState<string | null>(null);
   const [practiceId, setPracticeId] = useState<string | null>(null);
   const [state, setState] = useState<PublicRoomState | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
   async function startRound() {
+    const invalid = bayesPercentError(
+      percents.priorPercent,
+      percents.warningIfAlertPercent,
+      percents.warningIfCalmPercent
+    );
+    if (invalid) {
+      setPercentError(invalid);
+      return;
+    }
     setBusy(true);
     setError(null);
+    setPercentError(null);
     try {
       const response = await fetch("/api/practice", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action: "new", hintsEnabled: hints, bayes, trait }),
+        body: JSON.stringify({
+          action: "new",
+          hintsEnabled: hints,
+          bayes,
+          trait,
+          priorNoticed: percents.priorPercent / 100,
+          warningLikelihoodIfNoticed: percents.warningIfAlertPercent / 100,
+          warningLikelihoodIfNotNoticed: percents.warningIfCalmPercent / 100,
+        }),
       });
       const data = await response.json();
       if (!response.ok) {
@@ -93,33 +119,45 @@ export function PracticeApp() {
           <CardTitle>Round setup</CardTitle>
           <CardDescription>
             Leave true hit percents off. Leave the clue on so each round has two moods — Alert
-            (noticed the class) or Calm (did not) — and a warning light or quiet sensors.
+            (noticed the class) or Calm (did not) — and a warning light or quiet sensors. Alert
+            percents below feed the facts box for that round.
           </CardDescription>
         </CardHeader>
-        <CardContent className="flex flex-col gap-4 sm:flex-row sm:flex-wrap sm:items-end">
-          <label className="grid gap-2 text-sm">
-            Trait
-            <select
-              className="h-8 rounded-lg border border-input bg-transparent px-2 text-sm"
-              value={trait}
-              onChange={(event) => setTrait(event.target.value as MonsterTrait | "auto")}
-            >
-              <option value="walker">Walker</option>
-              <option value="spider">Spider</option>
-              <option value="hunter">Hunter</option>
-            </select>
-          </label>
-          <label className="flex items-center gap-3 text-sm">
-            <Switch checked={hints} onCheckedChange={(checked) => setHints(Boolean(checked))} />
-            Show true hit percents
-          </label>
-          <label className="flex items-center gap-3 text-sm">
-            <Switch checked={bayes} onCheckedChange={(checked) => setBayes(Boolean(checked))} />
-            Clue / two moods
-          </label>
-          <Button disabled={busy} onClick={() => void startRound()}>
-            {state ? "New round" : "Start a round"}
-          </Button>
+        <CardContent className="flex flex-col gap-4">
+          <div className="flex flex-col gap-4 sm:flex-row sm:flex-wrap sm:items-end">
+            <label className="grid gap-2 text-sm">
+              Trait
+              <select
+                className="h-8 rounded-lg border border-input bg-transparent px-2 text-sm"
+                value={trait}
+                onChange={(event) => setTrait(event.target.value as MonsterTrait | "auto")}
+              >
+                <option value="walker">Walker</option>
+                <option value="spider">Spider</option>
+                <option value="hunter">Hunter</option>
+              </select>
+            </label>
+            <label className="flex items-center gap-3 text-sm">
+              <Switch checked={hints} onCheckedChange={(checked) => setHints(Boolean(checked))} />
+              Show true hit percents
+            </label>
+            <label className="flex items-center gap-3 text-sm">
+              <Switch checked={bayes} onCheckedChange={(checked) => setBayes(Boolean(checked))} />
+              Clue / two moods
+            </label>
+            <Button disabled={busy} onClick={() => void startRound()}>
+              {state ? "New round" : "Start a round"}
+            </Button>
+          </div>
+          <BayesPercentFields
+            values={percents}
+            onChange={(next) => {
+              setPercents(next);
+              setPercentError(null);
+            }}
+            disabled={busy}
+            error={percentError}
+          />
         </CardContent>
       </Card>
 

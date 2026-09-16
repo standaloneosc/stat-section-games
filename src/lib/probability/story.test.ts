@@ -44,6 +44,21 @@ describe("player-facing noticed story", () => {
     expect(facts.join(" ")).not.toMatch(/14%|29%|18%|you can see/i);
   });
 
+  it("prints the current host percents, not hardcoded 40/80/20", () => {
+    const facts = clueWorldFacts({
+      priorNoticed: 0.25,
+      likelihoodIfNoticed: 0.9,
+      likelihoodIfNotNoticed: 0.1,
+      warning: true,
+    });
+    expect(facts).toEqual([
+      "The monster notices the class 25% of the time (before any clue).",
+      "If Alert, the light is on 90% of the time.",
+      "If Calm, the light is on 10% of the time.",
+    ]);
+    expect(facts.join(" ")).not.toMatch(/\b40%|\b80%|\b20%/);
+  });
+
   it("names the two calculation targets without spoiling answers", () => {
     expect(clueJobLine()).toBe(
       "You are calculating P(Alert | this clue), then P(hit this square)."

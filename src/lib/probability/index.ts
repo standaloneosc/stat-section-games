@@ -37,6 +37,7 @@ export {
   clueIsWarning,
   clueText,
   evidenceProbability,
+  bayesLikelihoodsAreUsable,
   QUIET_CLUE_TEXT,
   WARNING_CLUE_TEXT,
 } from "./bayes";

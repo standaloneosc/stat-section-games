@@ -1,5 +1,7 @@
 import { QUIET_CLUE_TEXT, WARNING_CLUE_TEXT } from "./story";
 
+const EVIDENCE_EPSILON = 1e-12;
+
 export function calculateBayesPosterior(
   prior: number,
   likelihoodIfTrue: number,
@@ -37,6 +39,17 @@ export function evidenceProbability(
     ? likelihoodIfFalse
     : 1 - likelihoodIfFalse;
   return pEvidenceGivenTrue * prior + pEvidenceGivenFalse * (1 - prior);
+}
+
+/** Both a warning and a quiet clue must be possible so Bayes has a denominator. */
+export function bayesLikelihoodsAreUsable(
+  prior: number,
+  warningIfAlert: number,
+  warningIfCalm: number
+): boolean {
+  const pWarning = evidenceProbability(prior, warningIfAlert, warningIfCalm, true);
+  const pQuiet = evidenceProbability(prior, warningIfAlert, warningIfCalm, false);
+  return pWarning > EVIDENCE_EPSILON && pQuiet > EVIDENCE_EPSILON;
 }
 
 export function clueIsWarning(clueId: string | null | undefined): boolean {

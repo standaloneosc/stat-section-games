@@ -9,6 +9,7 @@ export {
   getRoom,
   joinRoom,
   nextRound,
+  normalizeConfig,
   pauseGame,
   resolvePractice,
   resolveRound,
@@ -21,6 +22,13 @@ export {
   updateConfig,
 } from "./rooms";
 export { DEFAULT_GAME_CONFIG } from "./types";
+export {
+  DEFAULT_ALERT_PERCENT,
+  DEFAULT_WARNING_GIVEN_ALERT_PERCENT,
+  DEFAULT_WARNING_GIVEN_CALM_PERCENT,
+  bayesPercentError,
+  parseUnitInterval,
+} from "./bayes-percents";
 export type {
   GameConfig,
   PublicRoomState,

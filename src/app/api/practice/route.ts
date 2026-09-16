@@ -10,6 +10,9 @@ export async function POST(request: Request) {
       hintsEnabled?: boolean;
       bayes?: boolean;
       trait?: MonsterTrait | "auto";
+      priorNoticed?: number;
+      warningLikelihoodIfNoticed?: number;
+      warningLikelihoodIfNotNoticed?: number;
       practiceId?: string;
       selectedSquare?: string;
       estimatedHitPercent?: number;
@@ -32,6 +35,9 @@ export async function POST(request: Request) {
       hintsEnabled: body.hintsEnabled,
       bayes: body.bayes,
       trait: body.trait,
+      priorNoticed: body.priorNoticed,
+      warningLikelihoodIfNoticed: body.warningLikelihoodIfNoticed,
+      warningLikelihoodIfNotNoticed: body.warningLikelihoodIfNotNoticed,
     });
     return Response.json(created, { headers: noStore });
   } catch (error) {

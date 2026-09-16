@@ -10,7 +10,9 @@ import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { useCountdown, useRoomState } from "@/hooks/use-room";
 import type { GameConfig, PublicRoomState } from "@/lib/game";
+import { bayesPercentError, percentFromProbability } from "@/lib/game/bayes-percents";
 import { loadHostSession, loadPlayerSession, saveHostSession, savePlayerSession } from "@/lib/session";
+import { BayesPercentFields, type BayesPercentValues } from "./bayes-percent-fields";
 import { GameBoard } from "./board";
 import { LeaderboardCard, TimerBar } from "./panels";
 import { ResultsScreen } from "./results-screen";
@@ -251,7 +253,7 @@ function HostDesk(props: {
       </div>
 
       <HostConfig
-        key={`${state.config.roundDurationSeconds}-${state.config.roundCount}-${state.config.monsterTrait}-${String(state.config.bayesEnabled)}-${String(state.config.hintsEnabled)}`}
+        key={`${state.config.roundDurationSeconds}-${state.config.roundCount}-${state.config.monsterTrait}-${String(state.config.bayesEnabled)}-${String(state.config.hintsEnabled)}-${state.config.priorNoticed}-${state.config.warningLikelihoodIfNoticed}-${state.config.warningLikelihoodIfNotNoticed}`}
         config={state.config}
         locked={inPlay}
         busy={Boolean(busy)}
@@ -369,12 +371,41 @@ function HostConfig(props: {
   onSave: (config: Partial<GameConfig>) => void;
 }) {
   const [form, setForm] = useState(props.config);
+  const [percents, setPercents] = useState<BayesPercentValues>({
+    priorPercent: percentFromProbability(props.config.priorNoticed),
+    warningIfAlertPercent: percentFromProbability(props.config.warningLikelihoodIfNoticed),
+    warningIfCalmPercent: percentFromProbability(props.config.warningLikelihoodIfNotNoticed),
+  });
+  const [percentError, setPercentError] = useState<string | null>(null);
+
+  function save() {
+    const error = bayesPercentError(
+      percents.priorPercent,
+      percents.warningIfAlertPercent,
+      percents.warningIfCalmPercent
+    );
+    if (error) {
+      setPercentError(error);
+      return;
+    }
+    setPercentError(null);
+    props.onSave({
+      ...form,
+      priorNoticed: percents.priorPercent / 100,
+      warningLikelihoodIfNoticed: percents.warningIfAlertPercent / 100,
+      warningLikelihoodIfNotNoticed: percents.warningIfCalmPercent / 100,
+    });
+  }
 
   return (
     <Card>
       <CardHeader>
         <CardTitle>Classroom rules</CardTitle>
-        <CardDescription>These stick for the next game. They lock while a round is running unless you use the timing presets above in the lobby.</CardDescription>
+        <CardDescription>
+          Alert percents apply to the upcoming round, and to the current round if students are
+          still choosing. Other rules lock while a round is running unless you use the timing
+          presets above in the lobby.
+        </CardDescription>
       </CardHeader>
       <CardContent className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
         <Field label="Number of rounds">
@@ -454,8 +485,17 @@ function HostConfig(props: {
             onCheckedChange={(checked) => setForm({ ...form, showLeaderboard: Boolean(checked) })}
           />
         </label>
+        <BayesPercentFields
+          values={percents}
+          onChange={(next) => {
+            setPercents(next);
+            setPercentError(null);
+          }}
+          disabled={props.busy}
+          error={percentError}
+        />
         <div className="sm:col-span-2 lg:col-span-3">
-          <Button disabled={props.locked || props.busy} onClick={() => props.onSave(form)}>
+          <Button disabled={props.busy} onClick={save}>
             Save rules
           </Button>
         </div>
