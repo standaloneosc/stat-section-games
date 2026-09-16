@@ -11,6 +11,10 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import {
+  alertMoodLine,
+  calmMoodLine,
+  clueSight,
+  clueWorldFacts,
   describeModeMotion,
   formatPercent,
   type MonsterTrait,
@@ -59,10 +63,11 @@ export function MovementTable(props: {
   return (
     <Card>
       <CardHeader>
-        <CardTitle>{props.bayes ? "If it did not notice you" : "Movement modes"}</CardTitle>
+        <CardTitle>{props.bayes ? "Calm mood — did not notice you" : "Movement habits"}</CardTitle>
         <CardDescription>
-          Labeled modes you can add. These are how often each mode happens, not the hit chance of a
-          square.
+          {props.bayes
+            ? "If it is calm, mix these habits. The percents are how often each habit happens, not the hit chance of a square."
+            : "Mix these habits. The percents are how often each habit happens, not the hit chance of a square."}
         </CardDescription>
       </CardHeader>
       <CardContent>
@@ -89,28 +94,82 @@ export function MovementTable(props: {
   );
 }
 
+export function StoryCard(props: {
+  trait: MonsterTrait;
+  clueId: string | null;
+  priorNoticed: number | null;
+  likelihoodIfNoticed: number | null;
+  likelihoodIfNotNoticed: number | null;
+}) {
+  const warning = props.clueId === "warning";
+  const sight = clueSight(props.clueId);
+  const facts = clueWorldFacts({
+    priorNoticed: props.priorNoticed,
+    likelihoodIfNoticed: props.likelihoodIfNoticed,
+    likelihoodIfNotNoticed: props.likelihoodIfNotNoticed,
+    warning,
+  });
+
+  return (
+    <Card className="border-amber-300/30">
+      <CardHeader>
+        <CardTitle>Two moods, one clue</CardTitle>
+        <CardDescription>
+          The monster is either Alert or Calm this round. You are not told which.
+        </CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-3 text-sm leading-6">
+        <div className="grid gap-2 sm:grid-cols-2">
+          <div className="rounded-lg bg-rose-500/15 p-3">
+            <p className="font-semibold text-rose-100">Alert — noticed the class</p>
+            <p className="text-muted-foreground">{alertMoodLine(props.trait)}</p>
+          </div>
+          <div className="rounded-lg bg-emerald-500/15 p-3">
+            <p className="font-semibold text-emerald-100">Calm — did not notice you</p>
+            <p className="text-muted-foreground">{calmMoodLine()}</p>
+          </div>
+        </div>
+        <div className="rounded-lg border border-amber-300/40 bg-amber-500/10 p-3">
+          <p className="text-xs tracking-wide text-amber-200 uppercase">What you can see</p>
+          <p className="text-lg font-semibold text-foreground">{sight.title}</p>
+          <p>{sight.seen}</p>
+        </div>
+        <ul className="list-disc space-y-1 pl-5">
+          {facts.map((fact) => (
+            <li key={fact}>{fact}</li>
+          ))}
+        </ul>
+        <p className="text-muted-foreground">
+          Use those facts to update how likely it is Alert, given this clue. Then mix Alert vs Calm
+          to estimate the hit chance. Do not skip the update.
+        </p>
+      </CardContent>
+    </Card>
+  );
+}
+
 export function HelpPanel(props: { bayes?: boolean }) {
   return (
     <Card>
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
           <HelpCircle className="size-4" />
-          How to calculate
+          If you get stuck
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-3 text-sm leading-6 text-muted-foreground">
         {props.bayes ? (
           <p>
-            <span className="font-medium text-foreground">Hint first.</span> Use the clue to update
-            P(noticed | hint). Do that before you mix movement.
+            <span className="font-medium text-foreground">Clue first.</span> The light (or the
+            quiet) updates how likely Alert is. That is Bayes. Then mix Alert movement with Calm
+            movement using your updated number.
           </p>
-        ) : null}
-        <p>
-          <span className="font-medium text-foreground">Then mix.</span>{" "}
-          {props.bayes
-            ? "If it did not notice you, add the modes: P(hit s) = Σ P(s | mode) × P(mode). If it noticed you, use the hunt-the-center shares instead. Mix those two with your posterior."
-            : "P(hit square s) = Σ P(s | mode) × P(mode). Read where each mode goes, then add."}
-        </p>
+        ) : (
+          <p>
+            <span className="font-medium text-foreground">Mix the habits.</span> Hit chance for a
+            square is the sum of (where that habit goes) × (how often that habit happens).
+          </p>
+        )}
         <p>
           <span className="font-medium text-foreground">Payoff.</span> If you live, you earn 100 /
           (1 + other players on your square). A safer square that everyone picks can pay less.

@@ -92,8 +92,8 @@ export function PracticeApp() {
         <CardHeader>
           <CardTitle>Round setup</CardTitle>
           <CardDescription>
-            True hit percents are a spoiler — leave them off to work by hand. Leave the notice
-            hint on to practice Bayes every round, then mix movement.
+            Leave true hit percents off. Leave the clue on so each round has two moods — Alert
+            (noticed the class) or Calm (did not) — and a warning light or quiet sensors.
           </CardDescription>
         </CardHeader>
         <CardContent className="flex flex-col gap-4 sm:flex-row sm:flex-wrap sm:items-end">
@@ -115,7 +115,7 @@ export function PracticeApp() {
           </label>
           <label className="flex items-center gap-3 text-sm">
             <Switch checked={bayes} onCheckedChange={(checked) => setBayes(Boolean(checked))} />
-            Bayes challenge
+            Clue / two moods
           </label>
           <Button disabled={busy} onClick={() => void startRound()}>
             {state ? "New round" : "Start a round"}

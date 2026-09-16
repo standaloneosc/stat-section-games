@@ -33,8 +33,8 @@ Create room works without client JavaScript: the form posts to `/api/rooms` and 
 
 1. Open `/room/CODE` in another tab (or Join from home).
 2. Enter a display name.
-3. When the round starts, pick a highlighted legal square. Corners are off for a Walker in the center.
-4. Use the notice/hint to estimate `P(noticed | hint)`, then mix noticed vs not-noticed movement to estimate `P(hit)` for your square.
+3. When the round starts, read the clue (red warning light or all quiet).
+4. Update how likely the monster noticed the class, pick a highlighted legal square, and estimate the hit chance. Corners are off for a Walker in the center.
 5. Enter percents (type `20` for 20%, not `0.20`).
 6. Lock in before the timer ends. Late players get a random legal square and no probability bonus.
 
@@ -44,7 +44,7 @@ Player counts and other people's squares stay hidden until the results screen.
 
 ### Practice
 
-`/practice` is a single-player version of the same math. Leave true hit percents off to work by hand. The notice hint is on by default so you practice Bayes every round.
+`/practice` is a single-player version of the same math. Leave true hit percents off to work by hand. The clue / two moods switch is on by default.
 
 ## What the first round looks like
 
@@ -59,7 +59,12 @@ Round 1 is a Walker in the **center** `(1,1)` — five legal squares (stay plus 
 
 Students add those modes themselves (LOTP). Teachers can check against `P(left) = 0.19` and `P(center) = 0.24` after lock-in — those answers are not printed on the player board.
 
-Every round includes a notice/hint (warning light vs quiet sensors) unless the host turns Bayes off. Prior `P(noticed) = 0.40`. A warning is 80% likely if it noticed and 20% likely if it did not. If it noticed the class, it hunts the center (still only orthogonal for a Walker). Students compute `P(noticed | hint)`, then mix hunt vs the not-noticed table.
+Every round has two hidden moods unless the host turns the clue off:
+
+- **Alert** — it noticed the class and hunts the middle
+- **Calm** — it did not notice you and mixes Stay / Horizontal / Vertical / Wander
+
+The clue is something students can see: a red warning light, or all quiet. World facts they can plug into Bayes: it notices the class 40 times out of 100; a warning happens 80 times out of 100 when Alert and 20 times out of 100 when Calm. The player board does not print the posterior or the true hit percents.
 
 ## Scoring
 

@@ -423,7 +423,7 @@ function HostConfig(props: {
           </select>
         </Field>
         <label className="flex items-center justify-between gap-3 rounded-lg border border-border px-3 py-2 text-sm">
-          Notice / hint clues (Bayes every round)
+          Monster can notice the class (Bayes every round)
           <Switch
             checked={form.bayesEnabled}
             disabled={props.locked}

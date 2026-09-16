@@ -8,9 +8,9 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import type { PublicRoomState } from "@/lib/game";
-import { formatPercent, formatPosition, noticedMotionBlurb } from "@/lib/probability";
+import { formatPosition } from "@/lib/probability";
 import { GameBoard, squareLabel, traitLabel } from "./board";
-import { HelpPanel, MovementTable, TimerBar } from "./panels";
+import { HelpPanel, MovementTable, StoryCard, TimerBar } from "./panels";
 
 export function RoundScreen(props: {
   state: PublicRoomState;
@@ -84,7 +84,7 @@ export function RoundScreen(props: {
     if (bayes) {
       const posterior = Number(bayesPercent);
       if (!Number.isFinite(posterior) || posterior < 0 || posterior > 100) {
-        setFormError("Enter P(noticed | clue) between 0 and 100.");
+        setFormError("Enter how likely it noticed the class, given the clue (0 to 100).");
         return;
       }
     }
@@ -100,11 +100,6 @@ export function RoundScreen(props: {
     }
   }
 
-  const prior = round.bayes.priorNoticed;
-  const likeTrue = round.bayes.clueLikelihoodIfNoticed;
-  const likeFalse = round.bayes.clueLikelihoodIfNotNoticed;
-  const warning = round.bayes.clueId === "warning";
-
   return (
     <div className="grid gap-4 xl:grid-cols-[minmax(0,1.1fr)_minmax(0,0.9fr)]">
       <div className="space-y-4">
@@ -119,7 +114,13 @@ export function RoundScreen(props: {
           </div>
           <div className="flex flex-wrap gap-2">
             <Badge>{traitLabel(round.monster.trait)}</Badge>
-            {bayes ? <Badge variant="secondary">Notice hint</Badge> : <Badge variant="outline">LOTP round</Badge>}
+            {bayes ? (
+              <Badge variant="secondary">
+                {round.bayes.clueId === "quiet" ? "All quiet" : "Warning light"}
+              </Badge>
+            ) : (
+              <Badge variant="outline">No clue this round</Badge>
+            )}
             {you ? <Badge variant="outline">Score {you.score}</Badge> : null}
           </div>
         </div>
@@ -160,45 +161,35 @@ export function RoundScreen(props: {
         <Card>
           <CardHeader>
             <CardTitle>What you do this round</CardTitle>
-            <CardDescription>{round.monster.description}</CardDescription>
           </CardHeader>
-          <CardContent className="space-y-2 text-sm leading-6">
-            <p>1. Pick a highlighted legal square.</p>
+          <CardContent className="space-y-1 text-sm leading-6">
             {bayes ? (
               <>
-                <p>2. Use the hint to estimate P(noticed | hint).</p>
-                <p>3. Mix noticed vs not-noticed movement to estimate P(hit) for your square.</p>
+                <p>1. Read the clue.</p>
+                <p>2. Update how likely it noticed the class.</p>
+                <p>3. Pick a square.</p>
+                <p>4. Estimate the hit chance.</p>
               </>
             ) : (
-              <p>2. Add the movement modes to estimate P(hit) for your square.</p>
+              <>
+                <p>1. Pick a highlighted legal square.</p>
+                <p>2. Mix the movement habits to estimate the hit chance.</p>
+              </>
             )}
-            <p>{bayes ? "4" : "3"}. Enter percents, not decimals — type 20 for 20%.</p>
           </CardContent>
         </Card>
 
         {bayes ? (
-          <Card className="border-amber-300/30">
-            <CardHeader>
-              <CardTitle>Hint — did it notice the class?</CardTitle>
-              <CardDescription>{round.bayes.clueText}</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-2 text-sm leading-6">
-              <p>
-                Before any hint, it notices the class {prior === null ? "—" : formatPercent(prior)} of
-                the time.
-              </p>
-              <p>
-                {warning
-                  ? `A warning is ${likeTrue === null ? "—" : formatPercent(likeTrue)} likely if it noticed, and ${likeFalse === null ? "—" : formatPercent(likeFalse)} likely if it did not.`
-                  : `Quiet sensors are ${(likeTrue === null ? "—" : formatPercent(1 - likeTrue))} likely if it noticed, and ${likeFalse === null ? "—" : formatPercent(1 - likeFalse)} likely if it did not.`}
-              </p>
-              <p>{noticedMotionBlurb(round.monster.trait)}</p>
-              <p className="text-muted-foreground">
-                Update P(noticed | this hint), then mix. The hint is not optional.
-              </p>
-            </CardContent>
-          </Card>
-        ) : null}
+          <StoryCard
+            trait={round.monster.trait}
+            clueId={round.bayes.clueId}
+            priorNoticed={round.bayes.priorNoticed}
+            likelihoodIfNoticed={round.bayes.clueLikelihoodIfNoticed}
+            likelihoodIfNotNoticed={round.bayes.clueLikelihoodIfNotNoticed}
+          />
+        ) : (
+          <p className="text-sm text-muted-foreground">{round.monster.description}</p>
+        )}
 
         <MovementTable
           modes={round.monster.movementModes}
@@ -218,20 +209,9 @@ export function RoundScreen(props: {
                 <AlertDescription>You can still change it until the timer ends.</AlertDescription>
               </Alert>
             ) : null}
-            <div className="space-y-2">
-              <Label htmlFor="hit">Your P(hit) for that square (%)</Label>
-              <Input
-                id="hit"
-                inputMode="decimal"
-                placeholder=""
-                value={hitPercent}
-                disabled={locked}
-                onChange={(event) => setHitPercent(event.target.value)}
-              />
-            </div>
             {bayes ? (
               <div className="space-y-2">
-                <Label htmlFor="bayes">Your P(noticed | hint) (%)</Label>
+                <Label htmlFor="bayes">How likely it noticed the class, given the clue (%)</Label>
                 <Input
                   id="bayes"
                   inputMode="decimal"
@@ -242,6 +222,17 @@ export function RoundScreen(props: {
                 />
               </div>
             ) : null}
+            <div className="space-y-2">
+              <Label htmlFor="hit">How likely your square is hit (%)</Label>
+              <Input
+                id="hit"
+                inputMode="decimal"
+                placeholder=""
+                value={hitPercent}
+                disabled={locked}
+                onChange={(event) => setHitPercent(event.target.value)}
+              />
+            </div>
             {formError ? <p className="text-sm text-destructive">{formError}</p> : null}
             <Button
               className="w-full"

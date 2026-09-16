@@ -491,7 +491,7 @@ export function submitChoice(options: {
       options.bayesEstimate < 0 ||
       options.bayesEstimate > 1
     ) {
-      throw new GameError("This round also needs P(noticed | clue) between 0% and 100%.", 400);
+      throw new GameError("This round also needs how likely it noticed the class, 0% to 100%.", 400);
     }
   }
 

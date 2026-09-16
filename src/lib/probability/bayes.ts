@@ -1,3 +1,5 @@
+import { QUIET_CLUE_TEXT, WARNING_CLUE_TEXT } from "./story";
+
 export function calculateBayesPosterior(
   prior: number,
   likelihoodIfTrue: number,
@@ -41,8 +43,7 @@ export function clueIsWarning(clueId: string | null | undefined): boolean {
   return clueId === "warning";
 }
 
-export const WARNING_CLUE_TEXT = "A red warning light appeared.";
-export const QUIET_CLUE_TEXT = "The sensors stayed quiet. No warning light appeared.";
+export { QUIET_CLUE_TEXT, WARNING_CLUE_TEXT };
 
 export function clueText(clueId: string | null | undefined): string {
   if (clueId === "quiet") {

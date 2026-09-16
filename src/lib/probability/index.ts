@@ -40,6 +40,13 @@ export {
   WARNING_CLUE_TEXT,
 } from "./bayes";
 export {
+  alertMoodLine,
+  calmMoodLine,
+  clueSight,
+  clueWorldFacts,
+  timesOutOf100,
+} from "./story";
+export {
   brierScore,
   calculationError,
   calculateProbabilityBonus,

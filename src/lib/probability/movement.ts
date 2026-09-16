@@ -1,5 +1,6 @@
 import { getLocalDestinations, getNeighborPositions } from "./neighbors";
 import { posKey } from "./positions";
+import { alertMoodLine } from "./story";
 import type { MonsterTrait, MovementMode, Position, RoundConfig } from "./types";
 import { CENTER, PROBABILITY_TOLERANCE } from "./types";
 
@@ -166,13 +167,7 @@ export function describeModeMotion(modeId: string, trait: MonsterTrait): string 
 }
 
 export function noticedMotionBlurb(trait: MonsterTrait): string {
-  if (trait === "walker") {
-    return "If it noticed the class, it still only stays or steps orthogonally — corners stay out of range. Hunt the center with 6 shares on the middle and 1 share on each open side, then mix that hunt with the table below using P(noticed | hint).";
-  }
-  if (trait === "spider") {
-    return "If it noticed the class, it may step diagonally and hunts the center. When the center is in range it gets 6 parts out of 10; the other legal squares share the rest equally. Mix that hunt with the table using P(noticed | hint).";
-  }
-  return "If it noticed the class, it hunts the center. When the center is in range it gets 6 parts out of 10; the other legal squares share the rest equally. Mix that hunt with the table using P(noticed | hint).";
+  return alertMoodLine(trait);
 }
 
 export function resolveModeCatalog(roundConfig: RoundConfig) {
