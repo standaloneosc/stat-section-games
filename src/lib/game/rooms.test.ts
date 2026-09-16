@@ -111,7 +111,7 @@ describe("round resolution", () => {
     const [ava, ben] = [...room.players.values()];
     startGame(room, room.hostToken);
     const round = room.round!;
-    const dest = "1,1";
+    const dest = posKey(round.monster.currentPosition);
     const correct = round.correctHitProbabilities[dest];
     submitChoice({
       room,
@@ -186,8 +186,11 @@ describe("round resolution", () => {
     const rng = createSeededRandom(99);
     const round = createInternalRound(DEFAULT_GAME_CONFIG, 1, rng);
     expect(round.monster.trait).toBe("walker");
-    expect(posKey(round.monster.currentPosition)).toBe("1,1");
-    expect(round.correctHitProbabilities["0,1"]).toBeCloseTo(0.19, 8);
+    expect(posKey(round.monster.currentPosition)).toBe("1,0");
+    expect(round.legalSquares).toHaveLength(4);
+    expect(round.correctHitProbabilities["1,1"]).toBeCloseTo(0.45, 8);
+    expect(round.correctHitProbabilities["1,0"]).toBeCloseTo(0.15, 8);
+    expect(round.correctHitProbabilities["0,0"]).toBeCloseTo(0.2, 8);
   });
 
   it("requires a Bayes posterior on Bayes rounds", () => {

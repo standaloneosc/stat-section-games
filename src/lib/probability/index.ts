@@ -55,6 +55,8 @@ export {
 export {
   buildBayesExplanation,
   buildLotpExplanation,
+  buildLotpWorksheet,
+  buildBayesWorksheet,
   defaultExplanationSquare,
   explanationForRound,
   formatPercent,

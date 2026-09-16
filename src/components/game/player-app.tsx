@@ -30,8 +30,9 @@ export function PlayerApp(props: { code: string }) {
     enabled: Boolean(session),
   });
 
-  async function join(event: React.FormEvent) {
-    event.preventDefault();
+  async function join(event?: React.FormEvent | React.MouseEvent) {
+    event?.preventDefault();
+    if (joining) return;
     setJoining(true);
     setJoinError(null);
     try {
@@ -112,7 +113,12 @@ export function PlayerApp(props: { code: string }) {
                 />
               </div>
               {joinError ? <p className="text-sm text-destructive">{joinError}</p> : null}
-              <Button className="w-full" disabled={joining || name.trim().length < 1}>
+              <Button
+                type="submit"
+                className="w-full"
+                disabled={joining || name.trim().length < 1}
+                onClick={(event) => void join(event)}
+              >
                 {joining ? "Joining…" : "Join the game"}
               </Button>
             </form>

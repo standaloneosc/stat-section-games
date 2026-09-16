@@ -15,8 +15,51 @@ export function formatProbability(value: number, digits = 4): string {
   return rounded.toFixed(digits);
 }
 
-export function formatPercent(value: number, digits = 1): string {
-  return `${(value * 100).toFixed(digits)}%`;
+export function formatPercent(value: number, digits?: number): string {
+  const percent = value * 100;
+  if (digits === undefined) {
+    const tenth = Math.round((percent + Number.EPSILON) * 10) / 10;
+    if (Math.abs(tenth - Math.round(tenth)) < 1e-9) {
+      return `${Math.round(tenth)}%`;
+    }
+    return `${tenth}%`;
+  }
+  const rounded = Number(percent.toFixed(digits));
+  return `${rounded}%`;
+}
+
+export function buildLotpWorksheet(options: {
+  square: string;
+  modes: MovementMode[];
+}): string {
+  const position = formatPosition(parsePosKey(options.square));
+  const terms = options.modes.map((mode) => {
+    const conditional = mode.destinationWeights[options.square] ?? 0;
+    return `(${formatPercent(conditional)})(${formatPercent(mode.probability)})`;
+  });
+  return `P${position} = ${terms.join(" + ")} = ?`;
+}
+
+export function buildBayesWorksheet(options: {
+  prior: number;
+  likelihoodIfNoticed: number;
+  likelihoodIfNotNoticed: number;
+  warning: boolean;
+}): { evidenceLine: string; posteriorLine: string; mixHint: string } {
+  const prior = formatPercent(options.prior);
+  const notPrior = formatPercent(1 - options.prior);
+  const likeTrue = formatPercent(
+    options.warning ? options.likelihoodIfNoticed : 1 - options.likelihoodIfNoticed
+  );
+  const likeFalse = formatPercent(
+    options.warning ? options.likelihoodIfNotNoticed : 1 - options.likelihoodIfNotNoticed
+  );
+  const clue = options.warning ? "warning" : "quiet";
+  return {
+    evidenceLine: `P(${clue}) = (${likeTrue})(${prior}) + (${likeFalse})(${notPrior}) = ?`,
+    posteriorLine: `P(noticed | ${clue}) = (${likeTrue})(${prior}) / P(${clue}) = ?`,
+    mixHint: `Then mix the two movement rows with that posterior. Do not mix with the prior ${prior}.`,
+  };
 }
 
 export function buildLotpExplanation(options: {
@@ -98,6 +141,10 @@ export function defaultExplanationSquare(
   legalSquares: string[],
   start: Position
 ): string {
+  const center = posKey({ x: 1, y: 1 });
+  if (legalSquares.includes(center) && center !== posKey(start)) {
+    return center;
+  }
   const left = posKey({ x: start.x - 1, y: start.y });
   if (legalSquares.includes(left)) {
     return left;

@@ -315,11 +315,37 @@ function pickTrait(config: GameConfig, roundNumber: number): MonsterTrait {
   return cycle[(roundNumber - 1) % cycle.length];
 }
 
-function randomPosition(gridSize: number, rng: () => number): Position {
-  return {
-    x: Math.floor(rng() * gridSize),
-    y: Math.floor(rng() * gridSize),
-  };
+function pickStartPosition(
+  trait: MonsterTrait,
+  roundNumber: number,
+  bayesRound: boolean,
+  rng: () => number
+): Position {
+  if (roundNumber === 1 && trait === "walker") {
+    return { x: 1, y: 0 };
+  }
+  if (bayesRound) {
+    return { x: 0, y: 0 };
+  }
+  if (trait === "walker") {
+    const edges: Position[] = [
+      { x: 1, y: 0 },
+      { x: 1, y: 2 },
+      { x: 0, y: 1 },
+      { x: 2, y: 1 },
+    ];
+    return edges[Math.floor(rng() * edges.length)]!;
+  }
+  if (trait === "spider") {
+    const corners: Position[] = [
+      { x: 0, y: 0 },
+      { x: 2, y: 0 },
+      { x: 0, y: 2 },
+      { x: 2, y: 2 },
+    ];
+    return corners[Math.floor(rng() * corners.length)]!;
+  }
+  return { x: 0, y: 0 };
 }
 
 export function createInternalRound(
@@ -332,12 +358,9 @@ export function createInternalRound(
   let lastError: unknown = null;
 
   for (let attempt = 0; attempt < 24; attempt += 1) {
-    const currentPosition =
-      roundNumber === 1 && trait === "walker"
-        ? { x: 1, y: 1 }
-        : randomPosition(config.gridSize, rng);
+    const currentPosition = pickStartPosition(trait, roundNumber, bayesRound, rng);
     const movementModes =
-      trait === "walker" && roundNumber === 1
+      trait === "walker"
         ? TRAIT_MODE_CATALOG.walker
         : undefined;
     let hiddenState: "noticed" | "not-noticed" | null = null;
@@ -441,10 +464,10 @@ function toRoundConfig(round: InternalRound): RoundConfig {
     bayes: {
       enabled: round.bayes.enabled,
       hiddenState: round.bayes.hiddenState,
-      priorNoticed: round.bayes.priorNoticed ?? 0.4,
+      priorNoticed: round.bayes.priorNoticed ?? 0.25,
       clueId: round.bayes.clueId,
-      clueLikelihoodIfNoticed: round.bayes.clueLikelihoodIfNoticed ?? 0.8,
-      clueLikelihoodIfNotNoticed: round.bayes.clueLikelihoodIfNotNoticed ?? 0.2,
+      clueLikelihoodIfNoticed: round.bayes.clueLikelihoodIfNoticed ?? 0.9,
+      clueLikelihoodIfNotNoticed: round.bayes.clueLikelihoodIfNotNoticed ?? 0.1,
     },
   };
 }

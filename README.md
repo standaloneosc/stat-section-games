@@ -1,8 +1,10 @@
 # Hide & Seek Probability
 
-A local classroom game for teaching **conditional probability**, the **law of total probability**, and **Bayes' rule**. Players hide on a 3×3 board while one monster moves according to a public trait. Survival points are split with anyone who hid on the same square.
+A classroom game for teaching **conditional probability**, the **law of total probability**, and **Bayes' rule**. Players hide on a 3×3 board while one monster moves according to a public trait. Survival points are split with anyone who hid on the same square.
 
-This is a Next.js app with a server-authoritative in-memory room. Open it on a laptop, then join from other browser tabs. There are no accounts, no matchmaking, and no production deploy in this slice.
+Live: [https://stat-section-games.onrender.com](https://stat-section-games.onrender.com)
+
+This is a Next.js app with a server-authoritative in-memory room. Open it on a laptop, then join from other browser tabs. There are no accounts and no matchmaking. Rooms live in one Node process, so a host like Render (long-running `next start`) is required.
 
 ## Run locally
 
@@ -12,7 +14,7 @@ npm test
 npm run dev
 ```
 
-Then open [http://127.0.0.1:43147](http://127.0.0.1:43147). The dev server binds `0.0.0.0` on port **43147**.
+Then open [http://127.0.0.1:43147](http://127.0.0.1:43147). Production (`npm start`) binds `0.0.0.0` on `${PORT:-43147}`.
 
 ## How to play
 
@@ -30,7 +32,7 @@ Then open [http://127.0.0.1:43147](http://127.0.0.1:43147). The dev server binds
 1. Open `/room/CODE` in another tab (or Join from home).
 2. Enter a display name.
 3. When the round starts, pick a highlighted legal square.
-4. Enter the hit probability as a **percent** (type `19` for 19%, not `0.19`).
+4. Enter the hit probability as a **percent** (type `45` for 45%, not `0.45`).
 5. On Bayes rounds, also enter `P(noticed | clue)`.
 6. Lock in before the timer ends. Late players get a random legal square and no probability bonus.
 
@@ -42,13 +44,22 @@ Player counts and other people's squares stay hidden until the results screen.
 
 ## What the first round looks like
 
-Round 1 is the spec's Walker-in-the-center example:
+Round 1 is a Walker on the top edge `(1,0)` — four legal squares, not five uniform 20% spots.
 
-- stay 0.20, horizontal 0.30, vertical 0.30, random local 0.20
-- `P(left) = 0.19`, `P(center) = 0.24`
-- corners are disabled because they have probability 0
+| Mode | P(mode) | What it does from `(1,0)` |
+| --- | --- | --- |
+| Stay | 10% | stays on `(1,0)` |
+| Horizontal | 30% | left or right, equally |
+| Vertical | 40% | only down, to the center |
+| Wander | 20% | the four legal squares, equally |
 
-Every third round is a Bayes challenge (Hunter, hidden `noticedPlayers`, warning/quiet clue) unless the host turns Bayes off.
+Students add down a column. The worksheet for the center is:
+
+`P(1,1) = (0%)(10%) + (0%)(30%) + (100%)(40%) + (25%)(20%) = ?`
+
+which is **45%**. The start square is 15%. Left and right are 20% each.
+
+Every third round is a Bayes challenge (Hunter in a corner, hidden `noticed` state, warning/quiet clue) unless the host turns Bayes off. If it noticed the class, it hunts the center. If not, it stays or sidesteps. A warning updates P(noticed) from 25% to 75%, so the center's hit chance **is** that posterior.
 
 ## Scoring
 
@@ -62,8 +73,8 @@ Every third round is a Bayes challenge (Hunter, hidden `noticedPlayers`, warning
 npm test
 ```
 
-Covers neighbor generation, LOTP 0.19, Bayes 0.7273, edge renormalization, congestion payouts, calibration bonuses, hidden information before resolution, late submissions, and reconnect.
+Covers neighbor generation, LOTP 15/20/20/45, Bayes 25% → 75%, edge renormalization, congestion payouts, calibration bonuses, hidden information before resolution, late submissions, and reconnect.
 
 ## Notes
 
-Rooms live in the Node process memory. Restarting the dev server empties rooms. That is enough for a class on one machine; it is not a hosted service.
+Rooms live in the Node process memory. Restarting the server empties rooms. That is enough for a class on one machine.

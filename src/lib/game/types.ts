@@ -200,7 +200,7 @@ export const DEFAULT_GAME_CONFIG: GameConfig = {
   hintsEnabled: false,
   showStudentCalculations: true,
   showLeaderboard: true,
-  priorNoticed: 0.4,
-  warningLikelihoodIfNoticed: 0.8,
-  warningLikelihoodIfNotNoticed: 0.2,
+  priorNoticed: 0.25,
+  warningLikelihoodIfNoticed: 0.9,
+  warningLikelihoodIfNotNoticed: 0.1,
 };

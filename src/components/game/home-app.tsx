@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -15,9 +15,12 @@ export function HomeApp() {
   const [joinCode, setJoinCode] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState<"host" | "join" | null>(null);
+  const requestLock = useRef(false);
 
-  async function createRoom(event: React.FormEvent) {
-    event.preventDefault();
+  async function createRoom(event?: React.FormEvent | React.MouseEvent) {
+    event?.preventDefault();
+    if (requestLock.current) return;
+    requestLock.current = true;
     setBusy("host");
     setError(null);
     try {
@@ -35,12 +38,15 @@ export function HomeApp() {
     } catch (err) {
       setError(err instanceof Error ? err.message : "Could not create a room.");
     } finally {
+      requestLock.current = false;
       setBusy(null);
     }
   }
 
-  async function joinRoom(event: React.FormEvent) {
-    event.preventDefault();
+  async function joinRoom(event?: React.FormEvent | React.MouseEvent) {
+    event?.preventDefault();
+    if (requestLock.current) return;
+    requestLock.current = true;
     setBusy("join");
     setError(null);
     const code = joinCode.trim().toUpperCase();
@@ -63,6 +69,7 @@ export function HomeApp() {
     } catch (err) {
       setError(err instanceof Error ? err.message : "Could not join.");
     } finally {
+      requestLock.current = false;
       setBusy(null);
     }
   }
@@ -100,7 +107,12 @@ export function HomeApp() {
                   onChange={(event) => setHostName(event.target.value)}
                 />
               </div>
-              <Button className="w-full" disabled={busy !== null}>
+              <Button
+                type="submit"
+                className="w-full"
+                disabled={busy !== null}
+                onClick={(event) => void createRoom(event)}
+              >
                 {busy === "host" ? "Creating…" : "Create room"}
               </Button>
             </form>
@@ -135,7 +147,12 @@ export function HomeApp() {
                   required
                 />
               </div>
-              <Button className="w-full" disabled={busy !== null || joinName.trim().length < 1 || joinCode.trim().length < 4}>
+              <Button
+                type="submit"
+                className="w-full"
+                disabled={busy !== null || joinName.trim().length < 1 || joinCode.trim().length < 4}
+                onClick={(event) => void joinRoom(event)}
+              >
                 {busy === "join" ? "Joining…" : "Join"}
               </Button>
             </form>

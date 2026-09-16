@@ -8,31 +8,30 @@ export const TRAIT_MODE_CATALOG: Record<
   Array<{ id: string; label: string; probability: number }>
 > = {
   walker: [
-    { id: "stay", label: "Stay", probability: 0.2 },
+    { id: "stay", label: "Stay", probability: 0.1 },
     { id: "horizontal", label: "Horizontal", probability: 0.3 },
-    { id: "vertical", label: "Vertical", probability: 0.3 },
-    { id: "randomLocal", label: "Random local", probability: 0.2 },
+    { id: "vertical", label: "Vertical", probability: 0.4 },
+    { id: "randomLocal", label: "Wander", probability: 0.2 },
   ],
   spider: [
-    { id: "stay", label: "Stay", probability: 0.15 },
-    { id: "cardinal", label: "Cardinal", probability: 0.35 },
-    { id: "diagonal", label: "Diagonal", probability: 0.3 },
-    { id: "randomLocal", label: "Random local", probability: 0.2 },
+    { id: "stay", label: "Stay", probability: 0.2 },
+    { id: "cardinal", label: "Cardinal", probability: 0.3 },
+    { id: "diagonal", label: "Diagonal", probability: 0.5 },
   ],
   hunter: [
-    { id: "stay", label: "Stay", probability: 0.15 },
-    { id: "randomLocal", label: "Random local", probability: 0.45 },
-    { id: "targetSeeking", label: "Target-seeking", probability: 0.4 },
+    { id: "stay", label: "Stay", probability: 0.2 },
+    { id: "randomLocal", label: "Wander", probability: 0.3 },
+    { id: "targetSeeking", label: "Hunt the center", probability: 0.5 },
   ],
 };
 
 export const TRAIT_DESCRIPTIONS: Record<MonsterTrait, string> = {
   walker:
-    "The Walker stays put or steps one square north, south, east, or west. It cannot move diagonally.",
+    "The Walker stays, steps horizontally, steps vertically, or wanders among its legal squares. Those modes are not equally likely, so the legal spots are not 20% each.",
   spider:
-    "The Spider stays put or skitters one square in any of the eight directions, including diagonally.",
+    "The Spider stays, steps in a cardinal direction, or takes a diagonal. Diagonal is the heaviest mode, so the reachable diagonal square is the most dangerous.",
   hunter:
-    "The Hunter stays put or moves one square in any direction, and it puts extra weight on the center square when that square is in range.",
+    "The Hunter stays, wanders locally, or hunts the center (goes to the center if that square is legal). If it noticed the class, it hunts the center; if not, it stays or sidesteps.",
 };
 
 function uniformWeights(positions: Position[]): Record<string, number> {
@@ -98,21 +97,38 @@ export function destinationWeightsForMode(
     case "targetSeeking": {
       const destinations = getLocalDestinations(position, "spider", gridSize);
       const centerKey = posKey(CENTER);
-      const keys = destinations.map(posKey);
-      const hasCenter = keys.includes(centerKey);
-      if (!hasCenter || keys.length <= 1) {
-        return uniformWeights(destinations);
+      if (destinations.some((cell) => posKey(cell) === centerKey)) {
+        return { [centerKey]: 1 };
       }
-      const otherCount = keys.length - 1;
-      const weights: Record<string, number> = {};
-      for (const key of keys) {
-        weights[key] = key === centerKey ? 1.5 * otherCount : 1;
-      }
-      return normalizeDistribution(weights);
+      return uniformWeights(destinations);
     }
+    case "idleSidestep":
+      return idleSidestepWeights(position, gridSize);
     default:
       throw new Error(`Unknown movement mode: ${modeId}`);
   }
+}
+
+function idleSidestepWeights(position: Position, gridSize: number): Record<string, number> {
+  const destinations = getLocalDestinations(position, "spider", gridSize);
+  const centerKey = posKey(CENTER);
+  const stayKey = posKey(position);
+  const sides = destinations.filter((cell) => {
+    const key = posKey(cell);
+    return key !== centerKey && key !== stayKey;
+  });
+  if (stayKey === centerKey) {
+    return uniformWeights(sides.length > 0 ? sides : destinations);
+  }
+  if (sides.length === 0) {
+    return { [stayKey]: 1 };
+  }
+  const weights: Record<string, number> = { [stayKey]: 0.5 };
+  const share = 0.5 / sides.length;
+  for (const cell of sides) {
+    weights[posKey(cell)] = share;
+  }
+  return weights;
 }
 
 function modeLabel(id: string, fallback?: string): string {
@@ -125,8 +141,9 @@ function modeLabel(id: string, fallback?: string): string {
     vertical: "Vertical",
     cardinal: "Cardinal",
     diagonal: "Diagonal",
-    randomLocal: "Random local",
-    targetSeeking: "Target-seeking",
+    randomLocal: "Wander",
+    targetSeeking: "Hunt the center",
+    idleSidestep: "Stay or sidestep",
     noticed: "Noticed players",
     "not-noticed": "Did not notice",
   };
@@ -146,28 +163,20 @@ export function resolveModeCatalog(roundConfig: RoundConfig) {
 
 export function buildMovementModes(roundConfig: RoundConfig): MovementMode[] {
   if (roundConfig.bayes.enabled) {
-    const noticed = destinationWeightsForMode(
-      roundConfig.monster.currentPosition,
-      "hunter",
-      "targetSeeking",
-      roundConfig.gridSize
-    );
-    const notNoticed = destinationWeightsForMode(
-      roundConfig.monster.currentPosition,
-      "hunter",
-      "randomLocal",
-      roundConfig.gridSize
-    );
+    const position = roundConfig.monster.currentPosition;
+    const gridSize = roundConfig.gridSize;
+    const noticed = destinationWeightsForMode(position, "hunter", "targetSeeking", gridSize);
+    const notNoticed = destinationWeightsForMode(position, "hunter", "idleSidestep", gridSize);
     return [
       {
         id: "noticed",
-        label: "Noticed players",
+        label: "Noticed — hunt the center",
         probability: roundConfig.bayes.priorNoticed,
         destinationWeights: noticed,
       },
       {
         id: "not-noticed",
-        label: "Did not notice",
+        label: "Did not notice — stay or sidestep",
         probability: 1 - roundConfig.bayes.priorNoticed,
         destinationWeights: notNoticed,
       },

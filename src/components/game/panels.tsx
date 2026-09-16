@@ -11,7 +11,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { formatPercent, formatProbability, type MovementMode } from "@/lib/probability";
+import { formatPercent, type MovementMode, buildLotpWorksheet } from "@/lib/probability";
 import { squareLabel } from "./board";
 
 export function TimerBar(props: {
@@ -52,23 +52,24 @@ export function MovementTable(props: {
   modes: MovementMode[];
   legalSquares: string[];
   bayes?: boolean;
+  worksheetSquare?: string | null;
 }) {
   return (
     <Card>
       <CardHeader>
-        <CardTitle>{props.bayes ? "Movement if noticed vs not" : "Movement-mode table"}</CardTitle>
+        <CardTitle>{props.bayes ? "Movement if noticed vs not" : "Add the modes — they are not equal"}</CardTitle>
         <CardDescription>
           {props.bayes
-            ? "These are the two conditional distributions. Update the hidden-state probability with Bayes, then mix them."
-            : "Each mode is mutually exclusive. The hit probability of a square is the law of total probability over these modes."}
+            ? "A clue changes P(noticed). Mix these two rows with your posterior. Do not use the prior 25% as the mix weight."
+            : `${props.legalSquares.length} legal squares. Read down a column: P(hit) = Σ P(square | mode) × P(mode). Counting squares and taking 1/${props.legalSquares.length} is wrong.`}
         </CardDescription>
       </CardHeader>
-      <CardContent>
+      <CardContent className="space-y-3">
         <Table>
           <TableHeader>
             <TableRow>
               <TableHead>Mode</TableHead>
-              <TableHead>P(mode)</TableHead>
+              <TableHead>{props.bayes ? "Mix using" : "P(mode)"}</TableHead>
               {props.legalSquares.map((square) => (
                 <TableHead key={square}>{squareLabel(square)}</TableHead>
               ))}
@@ -78,16 +79,30 @@ export function MovementTable(props: {
             {props.modes.map((mode) => (
               <TableRow key={mode.id}>
                 <TableCell className="font-medium">{mode.label}</TableCell>
-                <TableCell className="font-mono">{formatProbability(mode.probability, 2)}</TableCell>
+                <TableCell className="font-mono text-xs sm:text-sm">
+                  {props.bayes
+                    ? mode.id === "noticed"
+                      ? "P(noticed | clue)"
+                      : "1 − P(noticed | clue)"
+                    : formatPercent(mode.probability)}
+                </TableCell>
                 {props.legalSquares.map((square) => (
                   <TableCell key={square} className="font-mono">
-                    {formatProbability(mode.destinationWeights[square] ?? 0, 2)}
+                    {formatPercent(mode.destinationWeights[square] ?? 0)}
                   </TableCell>
                 ))}
               </TableRow>
             ))}
           </TableBody>
         </Table>
+        {props.worksheetSquare ? (
+          <p className="rounded-lg bg-amber-500/10 px-3 py-2 font-mono text-sm leading-6">
+            {buildLotpWorksheet({
+              square: props.worksheetSquare,
+              modes: props.modes,
+            })}
+          </p>
+        ) : null}
       </CardContent>
     </Card>
   );

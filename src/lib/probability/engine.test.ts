@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  buildLotpWorksheet,
   buildMovementModes,
   calculateHitProbabilityForSquare,
   calculateBayesPosterior,
@@ -8,6 +9,7 @@ import {
   createSeededRandom,
   destinationWeightsForMode,
   explanationForRound,
+  formatPercent,
   getLegalSquares,
   getMovementDistribution,
   getNeighborPositions,
@@ -17,23 +19,43 @@ import {
   type RoundConfig,
 } from "./index";
 
+const walkerTop: RoundConfig = {
+  gridSize: 3,
+  monster: {
+    trait: "walker",
+    currentPosition: { x: 1, y: 0 },
+    movementModes: [
+      { id: "stay", probability: 0.1 },
+      { id: "horizontal", probability: 0.3 },
+      { id: "vertical", probability: 0.4 },
+      { id: "randomLocal", probability: 0.2 },
+    ],
+  },
+  bayes: {
+    enabled: false,
+    priorNoticed: 0.25,
+    clueLikelihoodIfNoticed: 0.9,
+    clueLikelihoodIfNotNoticed: 0.1,
+  },
+};
+
 const walkerCenter: RoundConfig = {
   gridSize: 3,
   monster: {
     trait: "walker",
     currentPosition: { x: 1, y: 1 },
     movementModes: [
-      { id: "stay", probability: 0.2 },
+      { id: "stay", probability: 0.1 },
       { id: "horizontal", probability: 0.3 },
-      { id: "vertical", probability: 0.3 },
+      { id: "vertical", probability: 0.4 },
       { id: "randomLocal", probability: 0.2 },
     ],
   },
   bayes: {
     enabled: false,
-    priorNoticed: 0.4,
-    clueLikelihoodIfNoticed: 0.8,
-    clueLikelihoodIfNotNoticed: 0.2,
+    priorNoticed: 0.25,
+    clueLikelihoodIfNoticed: 0.9,
+    clueLikelihoodIfNotNoticed: 0.1,
   },
 };
 
@@ -76,41 +98,36 @@ describe("neighbor generation", () => {
 });
 
 describe("LOTP walker example", () => {
-  it("gives P(left) = 0.19 from the center", () => {
-    const left = posKey({ x: 0, y: 1 });
-    expect(calculateHitProbabilityForSquare(left, walkerCenter)).toBeCloseTo(
-      0.19,
-      10
-    );
+  it("gives four legal squares with distinct hit probabilities from the top edge", () => {
+    const legal = getLegalSquares(walkerTop);
+    expect(legal.sort()).toEqual(["0,0", "1,0", "1,1", "2,0"].sort());
+    expect(calculateHitProbabilityForSquare("1,1", walkerTop)).toBeCloseTo(0.45, 10);
+    expect(calculateHitProbabilityForSquare("0,0", walkerTop)).toBeCloseTo(0.2, 10);
+    expect(calculateHitProbabilityForSquare("2,0", walkerTop)).toBeCloseTo(0.2, 10);
+    expect(calculateHitProbabilityForSquare("1,0", walkerTop)).toBeCloseTo(0.15, 10);
   });
 
-  it("gives P(center) = 0.24", () => {
-    const center = posKey({ x: 1, y: 1 });
-    expect(calculateHitProbabilityForSquare(center, walkerCenter)).toBeCloseTo(
-      0.24,
-      10
-    );
+  it("writes a fill-in LOTP line that does not leak the 45% answer", () => {
+    const text = buildLotpWorksheet({
+      square: "1,1",
+      modes: buildMovementModes(walkerTop),
+    });
+    expect(text).toContain("(100%)(40%)");
+    expect(text).toContain("(25%)(20%)");
+    expect(text).toContain("= ?");
+    expect(text).not.toContain("45%");
   });
 
-  it("gives P(right) = 0.19", () => {
-    const right = posKey({ x: 2, y: 1 });
-    expect(calculateHitProbabilityForSquare(right, walkerCenter)).toBeCloseTo(
-      0.19,
-      10
-    );
+  it("is not a uniform 20% split", () => {
+    const values = Object.values(getMovementDistribution(walkerTop));
+    expect(values.some((value) => Math.abs(value - 0.2) < 1e-9)).toBe(true);
+    expect(values.every((value) => Math.abs(value - 0.2) < 1e-9)).toBe(false);
   });
 
   it("makes every movement distribution sum to 1", () => {
-    const distribution = getMovementDistribution(walkerCenter);
+    const distribution = getMovementDistribution(walkerTop);
     const sum = Object.values(distribution).reduce((total, value) => total + value, 0);
     expect(sum).toBeCloseTo(1, 10);
-  });
-
-  it("filters legal squares to positive-probability cells and disables corners", () => {
-    const legal = getLegalSquares(walkerCenter);
-    expect(legal.sort()).toEqual(["0,1", "1,0", "1,1", "1,2", "2,1"].sort());
-    expect(legal).not.toContain("0,0");
-    expect(legal).not.toContain("2,2");
   });
 });
 
@@ -138,33 +155,59 @@ describe("edge renormalization", () => {
 });
 
 describe("Bayes example", () => {
-  it("gives P(noticed | warning) ≈ 0.7273", () => {
-    const posterior = calculateBayesPosterior(0.4, 0.8, 0.2, true);
-    expect(posterior).toBeCloseTo(0.7272727272, 6);
+  it("gives P(noticed | warning) = 0.75 with the classroom prior", () => {
+    expect(calculateBayesPosterior(0.25, 0.9, 0.1, true)).toBeCloseTo(0.75, 10);
   });
 
-  it("mixes Hunter movement after the warning", () => {
+  it("makes the warning a real update: center goes from 25% to 75%", () => {
     const config: RoundConfig = {
       gridSize: 3,
       monster: {
         trait: "hunter",
-        currentPosition: { x: 1, y: 0 },
+        currentPosition: { x: 0, y: 0 },
       },
       bayes: {
         enabled: true,
-        priorNoticed: 0.4,
+        priorNoticed: 0.25,
         clueId: "warning",
-        clueLikelihoodIfNoticed: 0.8,
-        clueLikelihoodIfNotNoticed: 0.2,
+        clueLikelihoodIfNoticed: 0.9,
+        clueLikelihoodIfNotNoticed: 0.1,
       },
     };
-    const center = posKey({ x: 1, y: 1 });
-    const hit = calculateHitProbabilityForSquare(center, config);
-    const posterior = calculateBayesPosterior(0.4, 0.8, 0.2, true);
-    const noticed = destinationWeightsForMode({ x: 1, y: 0 }, "hunter", "targetSeeking", 3)[center];
-    const notNoticed = destinationWeightsForMode({ x: 1, y: 0 }, "hunter", "randomLocal", 3)[center];
-    expect(hit).toBeCloseTo(noticed * posterior + notNoticed * (1 - posterior), 10);
-    expect(hit).toBeGreaterThan(0);
+    expect(getLegalSquares(config).sort()).toEqual(["0,0", "0,1", "1,0", "1,1"].sort());
+    expect(calculateHitProbabilityForSquare("1,1", config)).toBeCloseTo(0.75, 10);
+    expect(calculateHitProbabilityForSquare("0,0", config)).toBeCloseTo(0.125, 10);
+    expect(calculateHitProbabilityForSquare("1,0", config)).toBeCloseTo(0.0625, 10);
+    expect(calculateHitProbabilityForSquare("0,1", config)).toBeCloseTo(0.0625, 10);
+    expect(
+      calculateHitProbabilityForSquare("1,1", {
+        ...config,
+        bayes: { ...config.bayes, clueId: null },
+      })
+    ).toBeCloseTo(0.25, 10);
+  });
+});
+
+describe("spider from a corner", () => {
+  it("gives four legal squares with 15/15/20/50 percents", () => {
+    const spiderCorner: RoundConfig = {
+      gridSize: 3,
+      monster: {
+        trait: "spider",
+        currentPosition: { x: 0, y: 0 },
+      },
+      bayes: {
+        enabled: false,
+        priorNoticed: 0.25,
+        clueLikelihoodIfNoticed: 0.9,
+        clueLikelihoodIfNotNoticed: 0.1,
+      },
+    };
+    expect(getLegalSquares(spiderCorner).sort()).toEqual(["0,0", "0,1", "1,0", "1,1"].sort());
+    expect(calculateHitProbabilityForSquare("1,1", spiderCorner)).toBeCloseTo(0.5, 10);
+    expect(calculateHitProbabilityForSquare("0,0", spiderCorner)).toBeCloseTo(0.2, 10);
+    expect(calculateHitProbabilityForSquare("1,0", spiderCorner)).toBeCloseTo(0.15, 10);
+    expect(calculateHitProbabilityForSquare("0,1", spiderCorner)).toBeCloseTo(0.15, 10);
   });
 });
 
@@ -211,11 +254,11 @@ describe("deterministic sampling", () => {
 
 describe("educational correctness", () => {
   it("gives every legal square a positive hit probability and zeros the rest", () => {
-    const legal = new Set(getLegalSquares(walkerCenter));
+    const legal = new Set(getLegalSquares(walkerTop));
     for (const x of [0, 1, 2]) {
       for (const y of [0, 1, 2]) {
         const key = `${x},${y}`;
-        const probability = calculateHitProbabilityForSquare(key, walkerCenter);
+        const probability = calculateHitProbabilityForSquare(key, walkerTop);
         if (legal.has(key)) {
           expect(probability).toBeGreaterThan(0);
         } else {
@@ -225,15 +268,22 @@ describe("educational correctness", () => {
     }
   });
 
-  it("writes an explanation that matches the 0.19 LOTP example", () => {
-    const left = "0,1";
+  it("writes an explanation that matches the 0.45 LOTP example", () => {
+    const center = "1,1";
     const text = explanationForRound({
-      roundConfig: walkerCenter,
-      modes: buildMovementModes(walkerCenter),
-      square: left,
-      monsterStart: { x: 1, y: 1 },
+      roundConfig: walkerTop,
+      modes: buildMovementModes(walkerTop),
+      square: center,
+      monsterStart: { x: 1, y: 0 },
     });
-    expect(text).toMatch(/0\.19/);
+    expect(text).toMatch(/0\.45/);
     expect(text.toLowerCase()).toContain("law of total probability");
+  });
+
+  it("prints percents students can add by hand", () => {
+    expect(formatPercent(0.45)).toBe("45%");
+    expect(formatPercent(0.2)).toBe("20%");
+    expect(formatPercent(0.075)).toBe("7.5%");
+    expect(formatPercent(0.125)).toBe("12.5%");
   });
 });

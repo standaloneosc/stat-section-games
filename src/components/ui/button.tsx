@@ -1,5 +1,6 @@
 import { Button as ButtonPrimitive } from "@base-ui/react/button"
 import { cva, type VariantProps } from "class-variance-authority"
+import type { ButtonHTMLAttributes } from "react"
 import { cn } from "cn"
 
 const buttonVariants = cva(
@@ -43,12 +44,36 @@ function Button({
   className,
   variant = "default",
   size = "default",
+  type = "button",
+  nativeButton,
+  focusableWhenDisabled,
+  render,
   ...props
 }: ButtonPrimitive.Props & VariantProps<typeof buttonVariants>) {
+  const classNames = cn(buttonVariants({ variant, size, className }))
+
+  // Base UI's useButton always writes type="button" after caller props, so a
+  // shadcn <Button type="submit"> never submits a form. Create room / Join
+  // must be real native submit buttons.
+  if (type === "submit" || type === "reset") {
+    return (
+      <button
+        data-slot="button"
+        type={type}
+        className={classNames}
+        {...(props as ButtonHTMLAttributes<HTMLButtonElement>)}
+      />
+    )
+  }
+
   return (
     <ButtonPrimitive
       data-slot="button"
-      className={cn(buttonVariants({ variant, size, className }))}
+      type={type}
+      className={classNames}
+      nativeButton={nativeButton}
+      focusableWhenDisabled={focusableWhenDisabled}
+      render={render}
       {...props}
     />
   )

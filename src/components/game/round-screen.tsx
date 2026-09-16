@@ -8,7 +8,12 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import type { PublicRoomState } from "@/lib/game";
-import { formatPosition } from "@/lib/probability";
+import {
+  buildBayesWorksheet,
+  defaultExplanationSquare,
+  formatPercent,
+  formatPosition,
+} from "@/lib/probability";
 import { GameBoard, squareLabel, traitLabel } from "./board";
 import { HelpPanel, MovementTable, TimerBar } from "./panels";
 
@@ -46,6 +51,18 @@ export function RoundScreen(props: {
 
   const selectedLabel = selected ? squareLabel(selected) : "none yet";
   const bayes = Boolean(round?.bayes.enabled);
+  const worksheetSquare = round
+    ? defaultExplanationSquare(round.legalSquares, round.monster.currentPosition)
+    : null;
+  const bayesWorksheet =
+    bayes && round
+      ? buildBayesWorksheet({
+          prior: round.bayes.priorNoticed ?? 0,
+          likelihoodIfNoticed: round.bayes.clueLikelihoodIfNoticed ?? 0,
+          likelihoodIfNotNoticed: round.bayes.clueLikelihoodIfNotNoticed ?? 0,
+          warning: round.bayes.clueId === "warning",
+        })
+      : null;
 
   const canSubmit = useMemo(() => {
     if (!selected || locked) return false;
@@ -159,17 +176,39 @@ export function RoundScreen(props: {
           </CardHeader>
         </Card>
 
-        {bayes ? (
+        {bayes && bayesWorksheet ? (
           <Card className="border-amber-300/30">
             <CardHeader>
-              <CardTitle>Clue</CardTitle>
+              <CardTitle>Clue — update P(noticed)</CardTitle>
               <CardDescription>{round.bayes.clueText}</CardDescription>
             </CardHeader>
-            <CardContent className="space-y-2 font-mono text-sm">
-              <p>P(noticed) = {round.bayes.priorNoticed}</p>
-              <p>P(not noticed) = {round.bayes.priorNoticed === null ? "—" : (1 - round.bayes.priorNoticed).toFixed(2)}</p>
-              <p>P(warning | noticed) = {round.bayes.clueLikelihoodIfNoticed}</p>
-              <p>P(warning | not noticed) = {round.bayes.clueLikelihoodIfNotNoticed}</p>
+            <CardContent className="space-y-2 text-sm leading-6">
+              <p>
+                Before the clue, P(noticed) = {formatPercent(round.bayes.priorNoticed ?? 0)} and
+                P(not noticed) = {formatPercent(1 - (round.bayes.priorNoticed ?? 0))}. That prior is
+                not the mix weight after you see the clue.
+              </p>
+              <p>
+                P(clue | noticed) ={" "}
+                {formatPercent(
+                  round.bayes.clueId === "warning"
+                    ? (round.bayes.clueLikelihoodIfNoticed ?? 0)
+                    : 1 - (round.bayes.clueLikelihoodIfNoticed ?? 0)
+                )}
+                . P(clue | not noticed) ={" "}
+                {formatPercent(
+                  round.bayes.clueId === "warning"
+                    ? (round.bayes.clueLikelihoodIfNotNoticed ?? 0)
+                    : 1 - (round.bayes.clueLikelihoodIfNotNoticed ?? 0)
+                )}
+                .
+              </p>
+              <p className="rounded-lg bg-amber-500/10 px-3 py-2 font-mono leading-6">
+                {bayesWorksheet.evidenceLine}
+                <br />
+                {bayesWorksheet.posteriorLine}
+              </p>
+              <p className="text-muted-foreground">{bayesWorksheet.mixHint}</p>
             </CardContent>
           </Card>
         ) : null}
@@ -178,13 +217,14 @@ export function RoundScreen(props: {
           modes={round.monster.movementModes}
           legalSquares={round.legalSquares}
           bayes={bayes}
+          worksheetSquare={bayes ? null : worksheetSquare}
         />
 
         <Card>
           <CardHeader>
             <CardTitle>Your hide</CardTitle>
             <CardDescription>
-              Selected square: {selectedLabel}. Enter percents, not decimals — type 19 for 19%.
+              Selected square: {selectedLabel}. Enter percents, not decimals — type 45 for 45%.
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
@@ -201,7 +241,7 @@ export function RoundScreen(props: {
               <Input
                 id="hit"
                 inputMode="decimal"
-                placeholder="19"
+                placeholder="45"
                 value={hitPercent}
                 disabled={locked}
                 onChange={(event) => setHitPercent(event.target.value)}
@@ -213,7 +253,7 @@ export function RoundScreen(props: {
                 <Input
                   id="bayes"
                   inputMode="decimal"
-                  placeholder="72.7"
+                  placeholder="75"
                   value={bayesPercent}
                   disabled={locked}
                   onChange={(event) => setBayesPercent(event.target.value)}
