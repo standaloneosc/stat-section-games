@@ -1,7 +1,6 @@
 "use client";
 
 import { HelpCircle } from "lucide-react";
-import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   Table,
@@ -11,8 +10,12 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { formatPercent, type MovementMode, buildLotpWorksheet } from "@/lib/probability";
-import { squareLabel } from "./board";
+import {
+  describeModeMotion,
+  formatPercent,
+  type MonsterTrait,
+  type MovementMode,
+} from "@/lib/probability";
 
 export function TimerBar(props: {
   remainingMs: number;
@@ -35,8 +38,8 @@ export function TimerBar(props: {
             {String(minutes).padStart(2, "0")}:{String(rest).padStart(2, "0")}
           </p>
         </div>
-        {props.paused ? <Badge variant="secondary">Paused</Badge> : null}
-        {warning ? <Badge variant="destructive">Final seconds</Badge> : null}
+        {props.paused ? <span className="rounded-full bg-muted px-2 py-1 text-xs">Paused</span> : null}
+        {warning ? <span className="rounded-full bg-rose-500/20 px-2 py-1 text-xs text-rose-200">Final seconds</span> : null}
       </div>
       <div className="h-2 overflow-hidden rounded-full bg-muted">
         <div
@@ -50,65 +53,43 @@ export function TimerBar(props: {
 
 export function MovementTable(props: {
   modes: MovementMode[];
-  legalSquares: string[];
+  trait: MonsterTrait;
   bayes?: boolean;
-  worksheetSquare?: string | null;
 }) {
   return (
     <Card>
       <CardHeader>
-        <CardTitle>{props.bayes ? "Movement if noticed vs not" : "Add the modes — they are not equal"}</CardTitle>
+        <CardTitle>{props.bayes ? "If it did not notice you" : "Movement modes"}</CardTitle>
         <CardDescription>
-          {props.bayes
-            ? "A clue changes P(noticed). Mix these two rows with your posterior. Do not use the prior 25% as the mix weight."
-            : `${props.legalSquares.length} legal squares. Read down a column: P(hit) = Σ P(square | mode) × P(mode). Counting squares and taking 1/${props.legalSquares.length} is wrong.`}
+          Labeled modes you can add. These are how often each mode happens, not the hit chance of a
+          square.
         </CardDescription>
       </CardHeader>
-      <CardContent className="space-y-3">
+      <CardContent>
         <Table>
           <TableHeader>
             <TableRow>
               <TableHead>Mode</TableHead>
-              <TableHead>{props.bayes ? "Mix using" : "P(mode)"}</TableHead>
-              {props.legalSquares.map((square) => (
-                <TableHead key={square}>{squareLabel(square)}</TableHead>
-              ))}
+              <TableHead>How often</TableHead>
+              <TableHead>Where it goes</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {props.modes.map((mode) => (
               <TableRow key={mode.id}>
                 <TableCell className="font-medium">{mode.label}</TableCell>
-                <TableCell className="font-mono text-xs sm:text-sm">
-                  {props.bayes
-                    ? mode.id === "noticed"
-                      ? "P(noticed | clue)"
-                      : "1 − P(noticed | clue)"
-                    : formatPercent(mode.probability)}
-                </TableCell>
-                {props.legalSquares.map((square) => (
-                  <TableCell key={square} className="font-mono">
-                    {formatPercent(mode.destinationWeights[square] ?? 0)}
-                  </TableCell>
-                ))}
+                <TableCell className="font-mono">{formatPercent(mode.probability)}</TableCell>
+                <TableCell>{describeModeMotion(mode.id, props.trait)}</TableCell>
               </TableRow>
             ))}
           </TableBody>
         </Table>
-        {props.worksheetSquare ? (
-          <p className="rounded-lg bg-amber-500/10 px-3 py-2 font-mono text-sm leading-6">
-            {buildLotpWorksheet({
-              square: props.worksheetSquare,
-              modes: props.modes,
-            })}
-          </p>
-        ) : null}
       </CardContent>
     </Card>
   );
 }
 
-export function HelpPanel() {
+export function HelpPanel(props: { bayes?: boolean }) {
   return (
     <Card>
       <CardHeader>
@@ -118,24 +99,21 @@ export function HelpPanel() {
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-3 text-sm leading-6 text-muted-foreground">
+        {props.bayes ? (
+          <p>
+            <span className="font-medium text-foreground">Hint first.</span> Use the clue to update
+            P(noticed | hint). Do that before you mix movement.
+          </p>
+        ) : null}
         <p>
-          <span className="font-medium text-foreground">Law of total probability.</span>{" "}
-          P(monster hits square s) = Σ<sub>m</sub> P(s | mode m) × P(mode m).
+          <span className="font-medium text-foreground">Then mix.</span>{" "}
+          {props.bayes
+            ? "If it did not notice you, add the modes: P(hit s) = Σ P(s | mode) × P(mode). If it noticed you, use the hunt-the-center shares instead. Mix those two with your posterior."
+            : "P(hit square s) = Σ P(s | mode) × P(mode). Read where each mode goes, then add."}
         </p>
         <p>
-          <span className="font-medium text-foreground">Survival payoff.</span> If you live, you
-          earn 100 / (1 + other players on your square). A safer square that everyone picks can
-          pay less than a slightly riskier empty square.
-        </p>
-        <p>
-          <span className="font-medium text-foreground">Probability bonus.</span> After you pick a
-          square, estimate its hit probability. You can earn up to 20 points for being close to
-          the true value, even if the monster catches you.
-        </p>
-        <p>
-          <span className="font-medium text-foreground">Bayes rounds.</span> A clue updates
-          P(noticed | clue). Then mix the noticed and not-noticed movement tables with that
-          posterior to get P(hit | clue).
+          <span className="font-medium text-foreground">Payoff.</span> If you live, you earn 100 /
+          (1 + other players on your square). A safer square that everyone picks can pay less.
         </p>
       </CardContent>
     </Card>

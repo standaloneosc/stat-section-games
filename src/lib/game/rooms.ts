@@ -1,5 +1,5 @@
 import {
-  buildMovementModes,
+  buildTraitMovementModes,
   calculateProbabilityBonus,
   calculateSurvivalReward,
   calculationError,
@@ -304,10 +304,6 @@ export class GameError extends Error {
 }
 
 function pickTrait(config: GameConfig, roundNumber: number): MonsterTrait {
-  const bayesRound = config.bayesEnabled && roundNumber % config.bayesEveryNthRound === 0;
-  if (bayesRound) {
-    return "hunter";
-  }
   if (config.monsterTrait !== "auto") {
     return config.monsterTrait;
   }
@@ -315,26 +311,9 @@ function pickTrait(config: GameConfig, roundNumber: number): MonsterTrait {
   return cycle[(roundNumber - 1) % cycle.length];
 }
 
-function pickStartPosition(
-  trait: MonsterTrait,
-  roundNumber: number,
-  bayesRound: boolean,
-  rng: () => number
-): Position {
-  if (roundNumber === 1 && trait === "walker") {
-    return { x: 1, y: 0 };
-  }
-  if (bayesRound) {
-    return { x: 0, y: 0 };
-  }
+function pickStartPosition(trait: MonsterTrait, rng: () => number): Position {
   if (trait === "walker") {
-    const edges: Position[] = [
-      { x: 1, y: 0 },
-      { x: 1, y: 2 },
-      { x: 0, y: 1 },
-      { x: 2, y: 1 },
-    ];
-    return edges[Math.floor(rng() * edges.length)]!;
+    return { x: 1, y: 1 };
   }
   if (trait === "spider") {
     const corners: Position[] = [
@@ -345,7 +324,7 @@ function pickStartPosition(
     ];
     return corners[Math.floor(rng() * corners.length)]!;
   }
-  return { x: 0, y: 0 };
+  return { x: 1, y: 1 };
 }
 
 export function createInternalRound(
@@ -353,12 +332,12 @@ export function createInternalRound(
   roundNumber: number,
   rng: () => number = Math.random
 ): InternalRound {
-  const bayesRound = config.bayesEnabled && roundNumber % config.bayesEveryNthRound === 0;
+  const bayesRound = Boolean(config.bayesEnabled);
   const trait = pickTrait(config, roundNumber);
   let lastError: unknown = null;
 
   for (let attempt = 0; attempt < 24; attempt += 1) {
-    const currentPosition = pickStartPosition(trait, roundNumber, bayesRound, rng);
+    const currentPosition = pickStartPosition(trait, rng);
     const movementModes =
       trait === "walker"
         ? TRAIT_MODE_CATALOG.walker
@@ -402,7 +381,7 @@ export function createInternalRound(
         lastError = new Error("Need at least two legal squares");
         continue;
       }
-      const modes = buildMovementModes(roundConfig);
+      const modes = buildTraitMovementModes(roundConfig);
       const correctHitProbabilities = getCorrectHitProbabilities(roundConfig);
       const startedAt = nowIso();
       const deadline = new Date(
@@ -464,10 +443,10 @@ function toRoundConfig(round: InternalRound): RoundConfig {
     bayes: {
       enabled: round.bayes.enabled,
       hiddenState: round.bayes.hiddenState,
-      priorNoticed: round.bayes.priorNoticed ?? 0.25,
+      priorNoticed: round.bayes.priorNoticed ?? 0.4,
       clueId: round.bayes.clueId,
-      clueLikelihoodIfNoticed: round.bayes.clueLikelihoodIfNoticed ?? 0.9,
-      clueLikelihoodIfNotNoticed: round.bayes.clueLikelihoodIfNotNoticed ?? 0.1,
+      clueLikelihoodIfNoticed: round.bayes.clueLikelihoodIfNoticed ?? 0.8,
+      clueLikelihoodIfNotNoticed: round.bayes.clueLikelihoodIfNotNoticed ?? 0.2,
     },
   };
 }

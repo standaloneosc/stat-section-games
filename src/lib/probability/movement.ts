@@ -8,9 +8,9 @@ export const TRAIT_MODE_CATALOG: Record<
   Array<{ id: string; label: string; probability: number }>
 > = {
   walker: [
-    { id: "stay", label: "Stay", probability: 0.1 },
+    { id: "stay", label: "Stay", probability: 0.2 },
     { id: "horizontal", label: "Horizontal", probability: 0.3 },
-    { id: "vertical", label: "Vertical", probability: 0.4 },
+    { id: "vertical", label: "Vertical", probability: 0.3 },
     { id: "randomLocal", label: "Wander", probability: 0.2 },
   ],
   spider: [
@@ -27,11 +27,11 @@ export const TRAIT_MODE_CATALOG: Record<
 
 export const TRAIT_DESCRIPTIONS: Record<MonsterTrait, string> = {
   walker:
-    "The Walker stays, steps horizontally, steps vertically, or wanders among its legal squares. Those modes are not equally likely, so the legal spots are not 20% each.",
+    "The Walker stays put, steps left or right, steps up or down, or wanders among the current square and its orthogonal neighbors.",
   spider:
-    "The Spider stays, steps in a cardinal direction, or takes a diagonal. Diagonal is the heaviest mode, so the reachable diagonal square is the most dangerous.",
+    "The Spider stays, steps in a cardinal direction, or takes a diagonal. Those modes are not equally likely.",
   hunter:
-    "The Hunter stays, wanders locally, or hunts the center (goes to the center if that square is legal). If it noticed the class, it hunts the center; if not, it stays or sidesteps.",
+    "The Hunter stays, wanders locally, or hunts the center. Hunting puts extra weight on the middle when that square is reachable.",
 };
 
 function uniformWeights(positions: Position[]): Record<string, number> {
@@ -66,6 +66,10 @@ export function normalizeDistribution(
   return normalized;
 }
 
+function localTrait(trait: MonsterTrait): MonsterTrait {
+  return trait === "walker" ? "walker" : "spider";
+}
+
 export function destinationWeightsForMode(
   position: Position,
   trait: MonsterTrait,
@@ -94,41 +98,30 @@ export function destinationWeightsForMode(
         return uniformWeights([...stay, ...orthogonal]);
       }
       return uniformWeights(getLocalDestinations(position, "spider", gridSize));
-    case "targetSeeking": {
-      const destinations = getLocalDestinations(position, "spider", gridSize);
-      const centerKey = posKey(CENTER);
-      if (destinations.some((cell) => posKey(cell) === centerKey)) {
-        return { [centerKey]: 1 };
-      }
-      return uniformWeights(destinations);
-    }
-    case "idleSidestep":
-      return idleSidestepWeights(position, gridSize);
+    case "targetSeeking":
+      return huntCenterWeights(position, trait, gridSize);
     default:
       throw new Error(`Unknown movement mode: ${modeId}`);
   }
 }
 
-function idleSidestepWeights(position: Position, gridSize: number): Record<string, number> {
-  const destinations = getLocalDestinations(position, "spider", gridSize);
+export function huntCenterWeights(
+  position: Position,
+  trait: MonsterTrait,
+  gridSize: number
+): Record<string, number> {
+  const destinations = getLocalDestinations(position, localTrait(trait), gridSize);
   const centerKey = posKey(CENTER);
-  const stayKey = posKey(position);
-  const sides = destinations.filter((cell) => {
-    const key = posKey(cell);
-    return key !== centerKey && key !== stayKey;
-  });
-  if (stayKey === centerKey) {
-    return uniformWeights(sides.length > 0 ? sides : destinations);
+  const keys = destinations.map(posKey);
+  if (!keys.includes(centerKey) || keys.length <= 1) {
+    return uniformWeights(destinations);
   }
-  if (sides.length === 0) {
-    return { [stayKey]: 1 };
+  const otherCount = keys.length - 1;
+  const weights: Record<string, number> = {};
+  for (const key of keys) {
+    weights[key] = key === centerKey ? 1.5 * otherCount : 1;
   }
-  const weights: Record<string, number> = { [stayKey]: 0.5 };
-  const share = 0.5 / sides.length;
-  for (const cell of sides) {
-    weights[posKey(cell)] = share;
-  }
-  return weights;
+  return normalizeDistribution(weights);
 }
 
 function modeLabel(id: string, fallback?: string): string {
@@ -143,46 +136,62 @@ function modeLabel(id: string, fallback?: string): string {
     diagonal: "Diagonal",
     randomLocal: "Wander",
     targetSeeking: "Hunt the center",
-    idleSidestep: "Stay or sidestep",
     noticed: "Noticed players",
     "not-noticed": "Did not notice",
   };
   return named[id] ?? id;
 }
 
+export function describeModeMotion(modeId: string, trait: MonsterTrait): string {
+  switch (modeId) {
+    case "stay":
+      return "Stays on the current square";
+    case "horizontal":
+      return "Steps left or right (equal among open sides)";
+    case "vertical":
+      return "Steps up or down (equal among open sides)";
+    case "cardinal":
+      return "Steps up, down, left, or right";
+    case "diagonal":
+      return "Steps diagonally";
+    case "randomLocal":
+      return trait === "walker"
+        ? "Stays or steps to any orthogonal neighbor, equally"
+        : "Stays or steps to any adjacent square, equally";
+    case "targetSeeking":
+      return "Puts extra weight on the center when that square is in range";
+    default:
+      return "Moves locally";
+  }
+}
+
+export function noticedMotionBlurb(trait: MonsterTrait): string {
+  if (trait === "walker") {
+    return "If it noticed the class, it still only stays or steps orthogonally — corners stay out of range. Hunt the center with 6 shares on the middle and 1 share on each open side, then mix that hunt with the table below using P(noticed | hint).";
+  }
+  if (trait === "spider") {
+    return "If it noticed the class, it may step diagonally and hunts the center. When the center is in range it gets 6 parts out of 10; the other legal squares share the rest equally. Mix that hunt with the table using P(noticed | hint).";
+  }
+  return "If it noticed the class, it hunts the center. When the center is in range it gets 6 parts out of 10; the other legal squares share the rest equally. Mix that hunt with the table using P(noticed | hint).";
+}
+
 export function resolveModeCatalog(roundConfig: RoundConfig) {
   if (roundConfig.monster.movementModes && roundConfig.monster.movementModes.length > 0) {
-    return roundConfig.monster.movementModes.map((mode) => ({
-      id: mode.id,
-      label: modeLabel(mode.id, mode.label),
-      probability: mode.probability,
-    }));
+    const catalog = roundConfig.monster.movementModes.filter(
+      (mode) => mode.id !== "noticed" && mode.id !== "not-noticed"
+    );
+    if (catalog.length > 0) {
+      return catalog.map((mode) => ({
+        id: mode.id,
+        label: modeLabel(mode.id, mode.label),
+        probability: mode.probability,
+      }));
+    }
   }
   return TRAIT_MODE_CATALOG[roundConfig.monster.trait];
 }
 
-export function buildMovementModes(roundConfig: RoundConfig): MovementMode[] {
-  if (roundConfig.bayes.enabled) {
-    const position = roundConfig.monster.currentPosition;
-    const gridSize = roundConfig.gridSize;
-    const noticed = destinationWeightsForMode(position, "hunter", "targetSeeking", gridSize);
-    const notNoticed = destinationWeightsForMode(position, "hunter", "idleSidestep", gridSize);
-    return [
-      {
-        id: "noticed",
-        label: "Noticed — hunt the center",
-        probability: roundConfig.bayes.priorNoticed,
-        destinationWeights: noticed,
-      },
-      {
-        id: "not-noticed",
-        label: "Did not notice — stay or sidestep",
-        probability: 1 - roundConfig.bayes.priorNoticed,
-        destinationWeights: notNoticed,
-      },
-    ];
-  }
-
+export function buildTraitMovementModes(roundConfig: RoundConfig): MovementMode[] {
   return resolveModeCatalog(roundConfig).map((mode) => ({
     id: mode.id,
     label: modeLabel(mode.id, mode.label),
@@ -194,6 +203,38 @@ export function buildMovementModes(roundConfig: RoundConfig): MovementMode[] {
       roundConfig.gridSize
     ),
   }));
+}
+
+export function buildMovementModes(roundConfig: RoundConfig): MovementMode[] {
+  const traitModes = buildTraitMovementModes(roundConfig);
+  if (roundConfig.bayes.enabled) {
+    const notNoticed = mixDistributions(
+      traitModes.map((mode) => ({
+        probability: mode.probability,
+        distribution: mode.destinationWeights,
+      }))
+    );
+    const noticed = huntCenterWeights(
+      roundConfig.monster.currentPosition,
+      roundConfig.monster.trait,
+      roundConfig.gridSize
+    );
+    return [
+      {
+        id: "noticed",
+        label: "Noticed players",
+        probability: roundConfig.bayes.priorNoticed,
+        destinationWeights: noticed,
+      },
+      {
+        id: "not-noticed",
+        label: "Did not notice",
+        probability: 1 - roundConfig.bayes.priorNoticed,
+        destinationWeights: notNoticed,
+      },
+    ];
+  }
+  return traitModes;
 }
 
 export function mixDistributions(

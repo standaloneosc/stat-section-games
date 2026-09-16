@@ -13,6 +13,7 @@ export {
   posKey,
   positionsEqual,
   allSquares,
+  directionLabel,
 } from "./positions";
 export {
   getLocalDestinations,
@@ -22,8 +23,12 @@ export {
   TRAIT_DESCRIPTIONS,
   TRAIT_MODE_CATALOG,
   buildMovementModes,
+  buildTraitMovementModes,
+  describeModeMotion,
   destinationWeightsForMode,
   getMovementDistribution,
+  huntCenterWeights,
+  noticedMotionBlurb,
   normalizeDistribution,
 } from "./movement";
 export {

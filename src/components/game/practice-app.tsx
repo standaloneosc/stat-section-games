@@ -12,7 +12,7 @@ import { RoundScreen } from "./round-screen";
 
 export function PracticeApp() {
   const [hints, setHints] = useState(false);
-  const [bayes, setBayes] = useState(false);
+  const [bayes, setBayes] = useState(true);
   const [trait, setTrait] = useState<MonsterTrait | "auto">("walker");
   const [practiceId, setPracticeId] = useState<string | null>(null);
   const [state, setState] = useState<PublicRoomState | null>(null);
@@ -92,7 +92,8 @@ export function PracticeApp() {
         <CardHeader>
           <CardTitle>Round setup</CardTitle>
           <CardDescription>
-            Hints reveal true hit probabilities before you submit. Bayes uses a Hunter and a hidden noticed-players state.
+            True hit percents are a spoiler — leave them off to work by hand. Leave the notice
+            hint on to practice Bayes every round, then mix movement.
           </CardDescription>
         </CardHeader>
         <CardContent className="flex flex-col gap-4 sm:flex-row sm:flex-wrap sm:items-end">
@@ -110,7 +111,7 @@ export function PracticeApp() {
           </label>
           <label className="flex items-center gap-3 text-sm">
             <Switch checked={hints} onCheckedChange={(checked) => setHints(Boolean(checked))} />
-            Show hints
+            Show true hit percents
           </label>
           <label className="flex items-center gap-3 text-sm">
             <Switch checked={bayes} onCheckedChange={(checked) => setBayes(Boolean(checked))} />

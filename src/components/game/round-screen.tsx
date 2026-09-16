@@ -8,12 +8,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import type { PublicRoomState } from "@/lib/game";
-import {
-  buildBayesWorksheet,
-  defaultExplanationSquare,
-  formatPercent,
-  formatPosition,
-} from "@/lib/probability";
+import { formatPercent, formatPosition, noticedMotionBlurb } from "@/lib/probability";
 import { GameBoard, squareLabel, traitLabel } from "./board";
 import { HelpPanel, MovementTable, TimerBar } from "./panels";
 
@@ -51,18 +46,6 @@ export function RoundScreen(props: {
 
   const selectedLabel = selected ? squareLabel(selected) : "none yet";
   const bayes = Boolean(round?.bayes.enabled);
-  const worksheetSquare = round
-    ? defaultExplanationSquare(round.legalSquares, round.monster.currentPosition)
-    : null;
-  const bayesWorksheet =
-    bayes && round
-      ? buildBayesWorksheet({
-          prior: round.bayes.priorNoticed ?? 0,
-          likelihoodIfNoticed: round.bayes.clueLikelihoodIfNoticed ?? 0,
-          likelihoodIfNotNoticed: round.bayes.clueLikelihoodIfNotNoticed ?? 0,
-          warning: round.bayes.clueId === "warning",
-        })
-      : null;
 
   const canSubmit = useMemo(() => {
     if (!selected || locked) return false;
@@ -117,6 +100,11 @@ export function RoundScreen(props: {
     }
   }
 
+  const prior = round.bayes.priorNoticed;
+  const likeTrue = round.bayes.clueLikelihoodIfNoticed;
+  const likeFalse = round.bayes.clueLikelihoodIfNotNoticed;
+  const warning = round.bayes.clueId === "warning";
+
   return (
     <div className="grid gap-4 xl:grid-cols-[minmax(0,1.1fr)_minmax(0,0.9fr)]">
       <div className="space-y-4">
@@ -131,7 +119,7 @@ export function RoundScreen(props: {
           </div>
           <div className="flex flex-wrap gap-2">
             <Badge>{traitLabel(round.monster.trait)}</Badge>
-            {bayes ? <Badge variant="secondary">Bayes challenge</Badge> : <Badge variant="outline">LOTP round</Badge>}
+            {bayes ? <Badge variant="secondary">Notice hint</Badge> : <Badge variant="outline">LOTP round</Badge>}
             {you ? <Badge variant="outline">Score {you.score}</Badge> : null}
           </div>
         </div>
@@ -171,77 +159,71 @@ export function RoundScreen(props: {
       <div className="space-y-4">
         <Card>
           <CardHeader>
-            <CardTitle>Monster trait</CardTitle>
+            <CardTitle>What you do this round</CardTitle>
             <CardDescription>{round.monster.description}</CardDescription>
           </CardHeader>
+          <CardContent className="space-y-2 text-sm leading-6">
+            <p>1. Pick a highlighted legal square.</p>
+            {bayes ? (
+              <>
+                <p>2. Use the hint to estimate P(noticed | hint).</p>
+                <p>3. Mix noticed vs not-noticed movement to estimate P(hit) for your square.</p>
+              </>
+            ) : (
+              <p>2. Add the movement modes to estimate P(hit) for your square.</p>
+            )}
+            <p>{bayes ? "4" : "3"}. Enter percents, not decimals — type 20 for 20%.</p>
+          </CardContent>
         </Card>
 
-        {bayes && bayesWorksheet ? (
+        {bayes ? (
           <Card className="border-amber-300/30">
             <CardHeader>
-              <CardTitle>Clue — update P(noticed)</CardTitle>
+              <CardTitle>Hint — did it notice the class?</CardTitle>
               <CardDescription>{round.bayes.clueText}</CardDescription>
             </CardHeader>
             <CardContent className="space-y-2 text-sm leading-6">
               <p>
-                Before the clue, P(noticed) = {formatPercent(round.bayes.priorNoticed ?? 0)} and
-                P(not noticed) = {formatPercent(1 - (round.bayes.priorNoticed ?? 0))}. That prior is
-                not the mix weight after you see the clue.
+                Before any hint, it notices the class {prior === null ? "—" : formatPercent(prior)} of
+                the time.
               </p>
               <p>
-                P(clue | noticed) ={" "}
-                {formatPercent(
-                  round.bayes.clueId === "warning"
-                    ? (round.bayes.clueLikelihoodIfNoticed ?? 0)
-                    : 1 - (round.bayes.clueLikelihoodIfNoticed ?? 0)
-                )}
-                . P(clue | not noticed) ={" "}
-                {formatPercent(
-                  round.bayes.clueId === "warning"
-                    ? (round.bayes.clueLikelihoodIfNotNoticed ?? 0)
-                    : 1 - (round.bayes.clueLikelihoodIfNotNoticed ?? 0)
-                )}
-                .
+                {warning
+                  ? `A warning is ${likeTrue === null ? "—" : formatPercent(likeTrue)} likely if it noticed, and ${likeFalse === null ? "—" : formatPercent(likeFalse)} likely if it did not.`
+                  : `Quiet sensors are ${(likeTrue === null ? "—" : formatPercent(1 - likeTrue))} likely if it noticed, and ${likeFalse === null ? "—" : formatPercent(1 - likeFalse)} likely if it did not.`}
               </p>
-              <p className="rounded-lg bg-amber-500/10 px-3 py-2 font-mono leading-6">
-                {bayesWorksheet.evidenceLine}
-                <br />
-                {bayesWorksheet.posteriorLine}
+              <p>{noticedMotionBlurb(round.monster.trait)}</p>
+              <p className="text-muted-foreground">
+                Update P(noticed | this hint), then mix. The hint is not optional.
               </p>
-              <p className="text-muted-foreground">{bayesWorksheet.mixHint}</p>
             </CardContent>
           </Card>
         ) : null}
 
         <MovementTable
           modes={round.monster.movementModes}
-          legalSquares={round.legalSquares}
+          trait={round.monster.trait}
           bayes={bayes}
-          worksheetSquare={bayes ? null : worksheetSquare}
         />
 
         <Card>
           <CardHeader>
             <CardTitle>Your hide</CardTitle>
-            <CardDescription>
-              Selected square: {selectedLabel}. Enter percents, not decimals — type 45 for 45%.
-            </CardDescription>
+            <CardDescription>Selected square: {selectedLabel}.</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
             {you?.confirmed ? (
               <Alert>
                 <AlertTitle>Choice locked in</AlertTitle>
-                <AlertDescription>
-                  You can still change it until the timer ends.
-                </AlertDescription>
+                <AlertDescription>You can still change it until the timer ends.</AlertDescription>
               </Alert>
             ) : null}
             <div className="space-y-2">
-              <Label htmlFor="hit">Estimated hit probability for your square (%)</Label>
+              <Label htmlFor="hit">Your P(hit) for that square (%)</Label>
               <Input
                 id="hit"
                 inputMode="decimal"
-                placeholder="45"
+                placeholder=""
                 value={hitPercent}
                 disabled={locked}
                 onChange={(event) => setHitPercent(event.target.value)}
@@ -249,11 +231,11 @@ export function RoundScreen(props: {
             </div>
             {bayes ? (
               <div className="space-y-2">
-                <Label htmlFor="bayes">P(noticed | clue) (%)</Label>
+                <Label htmlFor="bayes">Your P(noticed | hint) (%)</Label>
                 <Input
                   id="bayes"
                   inputMode="decimal"
-                  placeholder="75"
+                  placeholder=""
                   value={bayesPercent}
                   disabled={locked}
                   onChange={(event) => setBayesPercent(event.target.value)}
@@ -268,15 +250,10 @@ export function RoundScreen(props: {
             >
               {props.submitting ? "Submitting…" : you?.confirmed ? "Update my choice" : "Lock in my choice"}
             </Button>
-            {round.hints ? (
-              <p className="text-xs text-amber-200">
-                Hints are on. Each legal square shows its true hit probability.
-              </p>
-            ) : null}
           </CardContent>
         </Card>
 
-        <HelpPanel />
+        <HelpPanel bayes={bayes} />
       </div>
     </div>
   );

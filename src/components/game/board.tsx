@@ -2,7 +2,15 @@
 
 import { Bug, Crosshair, Footprints } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { allSquares, formatPercent, formatPosition, parsePosKey, type MonsterTrait, type Position } from "@/lib/probability";
+import {
+  allSquares,
+  directionLabel,
+  formatPercent,
+  formatPosition,
+  parsePosKey,
+  type MonsterTrait,
+  type Position,
+} from "@/lib/probability";
 
 const TRAIT_ICON = {
   walker: Footprints,
@@ -65,7 +73,7 @@ export function GameBoard(props: {
                 <span className="flex flex-col items-center gap-1 text-rose-200">
                   <Icon className="size-7" />
                   <span className="text-[11px] font-medium tracking-wide uppercase">
-                    {props.resolved ? "Started" : "Monster"}
+                    {props.resolved ? "Started" : "Stay"}
                   </span>
                 </span>
               ) : null}
@@ -77,7 +85,7 @@ export function GameBoard(props: {
               ) : null}
               {!isStart && !isDest ? (
                 <span className="text-sm font-medium text-foreground/80">
-                  {legal ? "Hide here" : "Out of range"}
+                  {legal ? directionLabel(props.currentPosition, position) : "Out of range"}
                 </span>
               ) : null}
               {typeof hint === "number" ? (

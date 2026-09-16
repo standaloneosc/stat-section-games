@@ -423,7 +423,7 @@ function HostConfig(props: {
           </select>
         </Field>
         <label className="flex items-center justify-between gap-3 rounded-lg border border-border px-3 py-2 text-sm">
-          Bayes every 3rd round
+          Notice / hint clues (Bayes every round)
           <Switch
             checked={form.bayesEnabled}
             disabled={props.locked}
@@ -431,7 +431,7 @@ function HostConfig(props: {
           />
         </label>
         <label className="flex items-center justify-between gap-3 rounded-lg border border-border px-3 py-2 text-sm">
-          Show hints
+          Show true hit percents (spoiler)
           <Switch
             checked={form.hintsEnabled}
             disabled={props.locked}

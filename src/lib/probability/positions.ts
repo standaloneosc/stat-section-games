@@ -41,6 +41,29 @@ export function formatPosition(position: Position): string {
   return `(${position.x}, ${position.y})`;
 }
 
+export function directionLabel(from: Position, to: Position): string {
+  const dx = to.x - from.x;
+  const dy = to.y - from.y;
+  if (dx === 0 && dy === 0) {
+    return "Stay";
+  }
+  const vertical = dy < 0 ? "Up" : dy > 0 ? "Down" : "";
+  const horizontal = dx < 0 ? "left" : dx > 0 ? "right" : "";
+  if (vertical && horizontal) {
+    return `${vertical}-${horizontal}`;
+  }
+  if (vertical) {
+    return vertical;
+  }
+  if (dx < 0) {
+    return "Left";
+  }
+  if (dx > 0) {
+    return "Right";
+  }
+  return "Nearby";
+}
+
 export const ORTHOGONAL_DELTAS: Position[] = [
   { x: 0, y: -1 },
   { x: 0, y: 1 },

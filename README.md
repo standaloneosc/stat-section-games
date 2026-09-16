@@ -22,44 +22,44 @@ Then open [http://127.0.0.1:43147](http://127.0.0.1:43147). Production (`npm sta
 
 1. Click **Create room** on the home page.
 2. Share the four-character code or `/room/CODE` link.
-3. Optionally set round length (default 240 seconds), trait, Bayes, hints, and leaderboard.
+3. Optionally set round length (default 240 seconds), trait, Bayes, spoiler percents, and leaderboard.
 4. Use **Demo timing (45s)** before starting if you do not want a four-minute decision window.
 5. **Start game**, then **Pause**, **Resume**, **End round now**, **Next round**, or **End game**.
 6. Keep the host tab on `/room/CODE/host`. Host controls stay on the browser that created the room.
+
+Create room works without client JavaScript: the form posts to `/api/rooms` and sets a host cookie.
 
 ### Players
 
 1. Open `/room/CODE` in another tab (or Join from home).
 2. Enter a display name.
-3. When the round starts, pick a highlighted legal square.
-4. Enter the hit probability as a **percent** (type `45` for 45%, not `0.45`).
-5. On Bayes rounds, also enter `P(noticed | clue)`.
+3. When the round starts, pick a highlighted legal square. Corners are off for a Walker in the center.
+4. Use the notice/hint to estimate `P(noticed | hint)`, then mix noticed vs not-noticed movement to estimate `P(hit)` for your square.
+5. Enter percents (type `20` for 20%, not `0.20`).
 6. Lock in before the timer ends. Late players get a random legal square and no probability bonus.
+
+The player board does **not** show worked calculations or true square percents. Host and practice score against the true values after lock-in.
 
 Player counts and other people's squares stay hidden until the results screen.
 
 ### Practice
 
-`/practice` is a single-player version of the same math. Turn on hints to see true probabilities before you submit. Bayes practice uses a Hunter and a hidden noticed-players state.
+`/practice` is a single-player version of the same math. Leave true hit percents off to work by hand. The notice hint is on by default so you practice Bayes every round.
 
 ## What the first round looks like
 
-Round 1 is a Walker on the top edge `(1,0)` — four legal squares, not five uniform 20% spots.
+Round 1 is a Walker in the **center** `(1,1)` — five legal squares (stay plus the four sides). Corners are out of range.
 
-| Mode | P(mode) | What it does from `(1,0)` |
+| Mode | How often | Where it goes |
 | --- | --- | --- |
-| Stay | 10% | stays on `(1,0)` |
+| Stay | 20% | stays on the current square |
 | Horizontal | 30% | left or right, equally |
-| Vertical | 40% | only down, to the center |
-| Wander | 20% | the four legal squares, equally |
+| Vertical | 30% | up or down, equally |
+| Wander | 20% | stay or any orthogonal neighbor, equally |
 
-Students add down a column. The worksheet for the center is:
+Students add those modes themselves (LOTP). Teachers can check against `P(left) = 0.19` and `P(center) = 0.24` after lock-in — those answers are not printed on the player board.
 
-`P(1,1) = (0%)(10%) + (0%)(30%) + (100%)(40%) + (25%)(20%) = ?`
-
-which is **45%**. The start square is 15%. Left and right are 20% each.
-
-Every third round is a Bayes challenge (Hunter in a corner, hidden `noticed` state, warning/quiet clue) unless the host turns Bayes off. If it noticed the class, it hunts the center. If not, it stays or sidesteps. A warning updates P(noticed) from 25% to 75%, so the center's hit chance **is** that posterior.
+Every round includes a notice/hint (warning light vs quiet sensors) unless the host turns Bayes off. Prior `P(noticed) = 0.40`. A warning is 80% likely if it noticed and 20% likely if it did not. If it noticed the class, it hunts the center (still only orthogonal for a Walker). Students compute `P(noticed | hint)`, then mix hunt vs the not-noticed table.
 
 ## Scoring
 
@@ -73,7 +73,7 @@ Every third round is a Bayes challenge (Hunter in a corner, hidden `noticed` sta
 npm test
 ```
 
-Covers neighbor generation, LOTP 15/20/20/45, Bayes 25% → 75%, edge renormalization, congestion payouts, calibration bonuses, hidden information before resolution, late submissions, and reconnect.
+Covers neighbor generation, Walker-center LOTP 0.19/0.24, Bayes 0.40/0.80/0.20 → ≈0.7273, hunt-center weights, edge renormalization, congestion payouts, calibration bonuses, hidden information before resolution, late submissions, and reconnect.
 
 ## Notes
 

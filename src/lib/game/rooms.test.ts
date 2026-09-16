@@ -11,11 +11,15 @@ import {
 import { DEFAULT_GAME_CONFIG, type Room } from "./types";
 import { createSeededRandom, posKey } from "@/lib/probability";
 
-function seededRoom(): Room {
-  const { room } = createRoom({ hostName: "Ms. Park" });
+function seededRoom(config?: Partial<typeof DEFAULT_GAME_CONFIG>): Room {
+  const { room } = createRoom({ hostName: "Ms. Park", config });
   joinRoom({ code: room.code, name: "Ava" });
   joinRoom({ code: room.code, name: "Ben" });
   return room;
+}
+
+function posteriorGuess(room: Room): number | null {
+  return room.round?.bayes.enabled ? 0.73 : null;
 }
 
 describe("public state hiding", () => {
@@ -36,7 +40,7 @@ describe("public state hiding", () => {
       token: ava.token,
       selectedSquare: square,
       estimatedHitProbability: 0.19,
-      bayesEstimate: null,
+      bayesEstimate: posteriorGuess(room),
       confirm: true,
     });
 
@@ -107,7 +111,7 @@ describe("round resolution", () => {
   });
 
   it("lets a caught player keep a probability bonus", () => {
-    const room = seededRoom();
+    const room = seededRoom({ bayesEnabled: false });
     const [ava, ben] = [...room.players.values()];
     startGame(room, room.hostToken);
     const round = room.round!;
@@ -119,7 +123,7 @@ describe("round resolution", () => {
       token: ava.token,
       selectedSquare: dest,
       estimatedHitProbability: correct,
-      bayesEstimate: null,
+      bayesEstimate: posteriorGuess(room),
       confirm: true,
     });
     submitChoice({
@@ -128,7 +132,7 @@ describe("round resolution", () => {
       token: ben.token,
       selectedSquare: round.legalSquares[1],
       estimatedHitProbability: 0.9,
-      bayesEstimate: null,
+      bayesEstimate: posteriorGuess(room),
       confirm: true,
     });
 
@@ -163,7 +167,7 @@ describe("round resolution", () => {
       token: ava.token,
       selectedSquare: square,
       estimatedHitProbability: 0.24,
-      bayesEstimate: null,
+      bayesEstimate: posteriorGuess(room),
       confirm: true,
     });
     const again = joinRoom({
@@ -184,13 +188,58 @@ describe("round resolution", () => {
 
   it("uses the server destination, not a client-supplied square, for scoring", () => {
     const rng = createSeededRandom(99);
-    const round = createInternalRound(DEFAULT_GAME_CONFIG, 1, rng);
+    const round = createInternalRound({ ...DEFAULT_GAME_CONFIG, bayesEnabled: false }, 1, rng);
     expect(round.monster.trait).toBe("walker");
-    expect(posKey(round.monster.currentPosition)).toBe("1,0");
-    expect(round.legalSquares).toHaveLength(4);
-    expect(round.correctHitProbabilities["1,1"]).toBeCloseTo(0.45, 8);
-    expect(round.correctHitProbabilities["1,0"]).toBeCloseTo(0.15, 8);
-    expect(round.correctHitProbabilities["0,0"]).toBeCloseTo(0.2, 8);
+    expect(posKey(round.monster.currentPosition)).toBe("1,1");
+    expect(round.legalSquares).toHaveLength(5);
+    expect(round.legalSquares).not.toContain("0,0");
+    expect(round.correctHitProbabilities["1,1"]).toBeCloseTo(0.24, 8);
+    expect(round.correctHitProbabilities["0,1"]).toBeCloseTo(0.19, 8);
+  });
+
+  it("turns on a notice hint every round by default and still starts the Walker in the center", () => {
+    const round = createInternalRound(DEFAULT_GAME_CONFIG, 1, createSeededRandom(3));
+    expect(round.bayes.enabled).toBe(true);
+    expect(round.bayes.clueId).toMatch(/warning|quiet/);
+    expect(posKey(round.monster.currentPosition)).toBe("1,1");
+    expect(round.legalSquares).toHaveLength(5);
+    expect(round.monster.movementModes.map((mode) => mode.id)).toEqual([
+      "stay",
+      "horizontal",
+      "vertical",
+      "randomLocal",
+    ]);
+  });
+
+  it("keeps the notice hint on for later auto-cycle traits", () => {
+    const spider = createInternalRound(DEFAULT_GAME_CONFIG, 2, createSeededRandom(4));
+    const hunter = createInternalRound(DEFAULT_GAME_CONFIG, 3, createSeededRandom(5));
+    expect(spider.monster.trait).toBe("spider");
+    expect(hunter.monster.trait).toBe("hunter");
+    expect(spider.bayes.enabled).toBe(true);
+    expect(hunter.bayes.enabled).toBe(true);
+    expect(spider.bayes.clueId).toMatch(/warning|quiet/);
+    expect(hunter.bayes.clueId).toMatch(/warning|quiet/);
+  });
+
+  it("does not send true square percents or worksheets to players while they are choosing", () => {
+    const room = seededRoom();
+    startGame(room, room.hostToken);
+    const view = toPublicState({ room, hostToken: room.hostToken });
+    const json = JSON.stringify(view.round);
+    expect(view.round?.phase).toBe("choosing");
+    expect(view.round?.hints).toBeNull();
+    expect(view.round?.resolved).toBeNull();
+    expect(json).not.toContain("0.19");
+    expect(json).not.toContain("0.24");
+    expect(json).not.toMatch(/the answer is/i);
+    expect(json).not.toMatch(/P\(1,1\)/);
+    expect(view.round?.monster.movementModes.map((mode) => mode.id)).toEqual([
+      "stay",
+      "horizontal",
+      "vertical",
+      "randomLocal",
+    ]);
   });
 
   it("requires a Bayes posterior on Bayes rounds", () => {
