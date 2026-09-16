@@ -42,9 +42,10 @@ export {
 export {
   alertMoodLine,
   calmMoodLine,
+  clueJobLine,
   clueSight,
   clueWorldFacts,
-  timesOutOf100,
+  asPercent,
 } from "./story";
 export {
   brierScore,

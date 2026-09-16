@@ -64,7 +64,7 @@ Every round has two hidden moods unless the host turns the clue off:
 - **Alert** — it noticed the class and hunts the middle
 - **Calm** — it did not notice you and mixes Stay / Horizontal / Vertical / Wander
 
-The clue is something students can see: a red warning light, or all quiet. World facts they can plug into Bayes: it notices the class 40 times out of 100; a warning happens 80 times out of 100 when Alert and 20 times out of 100 when Calm. The player board does not print the posterior or the true hit percents.
+The clue is something students can see: a red warning light, or all quiet. World facts they can plug into Bayes: it notices the class 40% of the time; a warning happens 80% of the time when Alert and 20% of the time when Calm. They calculate P(Alert | clue), then P(hit this square). The player board does not print the posterior or the true hit percents.
 
 ## Scoring
 

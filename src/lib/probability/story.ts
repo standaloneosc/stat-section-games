@@ -3,9 +3,8 @@ import type { MonsterTrait } from "./types";
 export const WARNING_CLUE_TEXT = "A red warning light flashed on the wall.";
 export const QUIET_CLUE_TEXT = "The sensors stayed quiet. No warning light.";
 
-export function timesOutOf100(probability: number): string {
-  const n = Math.round(probability * 100);
-  return `${n} time${n === 1 ? "" : "s"} out of 100`;
+export function asPercent(probability: number): string {
+  return `${Math.round(probability * 100)}%`;
 }
 
 export function clueSight(clueId: string | null | undefined): {
@@ -33,27 +32,34 @@ export function clueWorldFacts(options: {
   const facts: string[] = [];
   if (options.priorNoticed !== null) {
     facts.push(
-      `Before any clue, the monster notices the class ${timesOutOf100(options.priorNoticed)}.`
+      `Before any clue, the monster notices the class ${asPercent(options.priorNoticed)} of the time.`
     );
   }
   if (options.likelihoodIfNoticed !== null && options.likelihoodIfNotNoticed !== null) {
     if (options.warning) {
       facts.push(
-        `When it noticed the class, a warning light happens ${timesOutOf100(options.likelihoodIfNoticed)}.`
+        `When it noticed the class, a warning light happens ${asPercent(options.likelihoodIfNoticed)} of the time.`
       );
       facts.push(
-        `When it did not notice you, a warning light still happens ${timesOutOf100(options.likelihoodIfNotNoticed)} (a false alarm).`
+        `When it did not notice you, a warning light still happens ${asPercent(options.likelihoodIfNotNoticed)} of the time (a false alarm).`
       );
     } else {
       facts.push(
-        `When it noticed the class, the sensors stay quiet ${timesOutOf100(1 - options.likelihoodIfNoticed)}.`
+        `When it noticed the class, the sensors stay quiet ${asPercent(1 - options.likelihoodIfNoticed)} of the time.`
       );
       facts.push(
-        `When it did not notice you, the sensors stay quiet ${timesOutOf100(1 - options.likelihoodIfNotNoticed)}.`
+        `When it did not notice you, the sensors stay quiet ${asPercent(1 - options.likelihoodIfNotNoticed)} of the time.`
       );
     }
   }
   return facts;
+}
+
+export function clueJobLine(clueId: string | null | undefined): string {
+  if (clueId === "quiet") {
+    return "You are calculating two things. First: given All quiet, how likely the monster noticed the class — P(Alert | All quiet). Then use that to get P(hit this square).";
+  }
+  return "You are calculating two things. First: given the red warning light, how likely the monster noticed the class — P(Alert | warning light). Then use that to get P(hit this square).";
 }
 
 export function alertMoodLine(trait: MonsterTrait): string {

@@ -13,6 +13,7 @@ import {
 import {
   alertMoodLine,
   calmMoodLine,
+  clueJobLine,
   clueSight,
   clueWorldFacts,
   describeModeMotion,
@@ -139,10 +140,7 @@ export function StoryCard(props: {
             <li key={fact}>{fact}</li>
           ))}
         </ul>
-        <p className="text-muted-foreground">
-          Use those facts to update how likely it is Alert, given this clue. Then mix Alert vs Calm
-          to estimate the hit chance. Do not skip the update.
-        </p>
+        <p className="text-muted-foreground">{clueJobLine(props.clueId)}</p>
       </CardContent>
     </Card>
   );
