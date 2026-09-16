@@ -10,7 +10,7 @@ import { Label } from "@/components/ui/label";
 import type { PublicRoomState } from "@/lib/game";
 import { formatPosition } from "@/lib/probability";
 import { GameBoard, squareLabel, traitLabel } from "./board";
-import { HelpPanel, MovementTable, StoryCard, TimerBar } from "./panels";
+import { HelpPanel, MovementTable, ClueFactsCard, MoodsCard, TimerBar } from "./panels";
 
 export function RoundScreen(props: {
   state: PublicRoomState;
@@ -101,102 +101,104 @@ export function RoundScreen(props: {
   }
 
   return (
-    <div className="grid gap-4 xl:grid-cols-[minmax(0,1.1fr)_minmax(0,0.9fr)]">
-      <div className="space-y-4">
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <div>
-            <p className="text-xs tracking-wide text-muted-foreground uppercase">
-              Round {round.roundNumber} of {props.state.config.roundCount}
-            </p>
-            <h2 className="text-2xl font-semibold tracking-tight">
-              {traitLabel(round.monster.trait)} on {formatPosition(round.monster.currentPosition)}
-            </h2>
-          </div>
-          <div className="flex flex-wrap gap-2">
-            <Badge>{traitLabel(round.monster.trait)}</Badge>
-            {bayes ? (
-              <Badge variant="secondary">
-                {round.bayes.clueId === "quiet" ? "All quiet" : "Warning light"}
-              </Badge>
-            ) : (
-              <Badge variant="outline">No clue this round</Badge>
-            )}
-            {you ? <Badge variant="outline">Score {you.score}</Badge> : null}
-          </div>
+    <div className="space-y-4">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div>
+          <p className="text-xs tracking-wide text-muted-foreground uppercase">
+            Round {round.roundNumber} of {props.state.config.roundCount}
+          </p>
+          <h2 className="text-2xl font-semibold tracking-tight">
+            {traitLabel(round.monster.trait)} on {formatPosition(round.monster.currentPosition)}
+          </h2>
         </div>
-
-        {!props.practice ? (
-          <TimerBar
-            remainingMs={remaining}
-            totalMs={round.phase === "results" ? props.state.config.resultsDurationSeconds * 1000 : total}
-            paused={round.paused}
-            label={round.phase === "results" ? "Results on screen" : "Time to calculate and submit"}
-          />
-        ) : null}
-
-        {remaining <= 20_000 && choosing && !round.paused ? (
-          <Alert variant="destructive">
-            <AlertTitle>Last 20 seconds</AlertTitle>
-            <AlertDescription>
-              Lock in a square and a probability. If you miss it, the server assigns a random legal square and marks you as late.
-            </AlertDescription>
-          </Alert>
-        ) : null}
-
-        <GameBoard
-          monsterTrait={round.monster.trait}
-          currentPosition={round.monster.currentPosition}
-          legalSquares={round.legalSquares}
-          selectedSquare={selected || you?.selectedSquare || null}
-          destination={round.resolved?.destination ?? null}
-          playerCounts={round.resolved?.playerCounts ?? null}
-          hints={round.hints}
-          resolved={round.phase === "results"}
-          disabled={locked}
-          onSelect={setSelected}
-        />
+        <div className="flex flex-wrap gap-2">
+          <Badge>{traitLabel(round.monster.trait)}</Badge>
+          {bayes ? (
+            <Badge variant="secondary">
+              {round.bayes.clueId === "quiet" ? "All quiet" : "Warning light"}
+            </Badge>
+          ) : (
+            <Badge variant="outline">No clue this round</Badge>
+          )}
+          {you ? <Badge variant="outline">Score {you.score}</Badge> : null}
+        </div>
       </div>
 
-      <div className="space-y-4">
-        <Card>
-          <CardHeader>
-            <CardTitle>What you do this round</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-1 text-sm leading-6">
-            {bayes ? (
-              <>
-                <p>1. Read the clue.</p>
-                <p>2. Update how likely it noticed the class.</p>
-                <p>3. Pick a square.</p>
-                <p>4. Estimate the hit chance.</p>
-              </>
-            ) : (
-              <>
-                <p>1. Pick a highlighted legal square.</p>
-                <p>2. Mix the movement habits to estimate the hit chance.</p>
-              </>
-            )}
-          </CardContent>
-        </Card>
+      {!props.practice ? (
+        <TimerBar
+          remainingMs={remaining}
+          totalMs={round.phase === "results" ? props.state.config.resultsDurationSeconds * 1000 : total}
+          paused={round.paused}
+          label={round.phase === "results" ? "Results on screen" : "Time to calculate and submit"}
+        />
+      ) : null}
 
-        {bayes ? (
-          <StoryCard
-            trait={round.monster.trait}
-            clueId={round.bayes.clueId}
-            priorNoticed={round.bayes.priorNoticed}
-            likelihoodIfNoticed={round.bayes.clueLikelihoodIfNoticed}
-            likelihoodIfNotNoticed={round.bayes.clueLikelihoodIfNotNoticed}
+      {remaining <= 20_000 && choosing && !round.paused ? (
+        <Alert variant="destructive">
+          <AlertTitle>Last 20 seconds</AlertTitle>
+          <AlertDescription>
+            Lock in a square and a probability. If you miss it, the server assigns a random legal square and marks you as late.
+          </AlertDescription>
+        </Alert>
+      ) : null}
+
+      <div className="grid items-start gap-4 lg:grid-cols-[minmax(0,1.15fr)_minmax(16rem,0.85fr)]">
+        <div className="mx-auto w-full max-w-lg lg:mx-0 lg:max-w-none">
+          <GameBoard
+            monsterTrait={round.monster.trait}
+            currentPosition={round.monster.currentPosition}
+            legalSquares={round.legalSquares}
+            selectedSquare={selected || you?.selectedSquare || null}
+            destination={round.resolved?.destination ?? null}
+            playerCounts={round.resolved?.playerCounts ?? null}
+            hints={round.hints}
+            resolved={round.phase === "results"}
+            disabled={locked}
+            onSelect={setSelected}
           />
-        ) : (
-          <p className="text-sm text-muted-foreground">{round.monster.description}</p>
-        )}
+        </div>
+        <div className="space-y-4">
+          <Card>
+            <CardHeader className="pb-3">
+              <CardTitle>What you do this round</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-1 text-sm leading-6">
+              {bayes ? (
+                <>
+                  <p>1. Read the clue.</p>
+                  <p>2. Update how likely it noticed the class.</p>
+                  <p>3. Pick a square.</p>
+                  <p>4. Estimate the hit chance.</p>
+                </>
+              ) : (
+                <>
+                  <p>1. Pick a highlighted legal square.</p>
+                  <p>2. Mix the movement habits to estimate the hit chance.</p>
+                </>
+              )}
+            </CardContent>
+          </Card>
+          {bayes ? (
+            <ClueFactsCard
+              clueId={round.bayes.clueId}
+              priorNoticed={round.bayes.priorNoticed}
+              likelihoodIfNoticed={round.bayes.clueLikelihoodIfNoticed}
+              likelihoodIfNotNoticed={round.bayes.clueLikelihoodIfNotNoticed}
+            />
+          ) : (
+            <p className="text-sm text-muted-foreground">{round.monster.description}</p>
+          )}
+        </div>
+      </div>
 
+      {bayes ? <MoodsCard trait={round.monster.trait} /> : null}
+
+      <div className="grid items-start gap-4 lg:grid-cols-2">
         <MovementTable
           modes={round.monster.movementModes}
           trait={round.monster.trait}
           bayes={bayes}
         />
-
         <Card>
           <CardHeader>
             <CardTitle>Your hide</CardTitle>
@@ -243,9 +245,9 @@ export function RoundScreen(props: {
             </Button>
           </CardContent>
         </Card>
-
-        <HelpPanel bayes={bayes} />
       </div>
+
+      <HelpPanel bayes={bayes} />
     </div>
   );
 }

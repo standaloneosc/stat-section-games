@@ -95,8 +95,32 @@ export function MovementTable(props: {
   );
 }
 
-export function StoryCard(props: {
-  trait: MonsterTrait;
+export function MoodsCard(props: { trait: MonsterTrait }) {
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle>Alert vs Calm</CardTitle>
+        <CardDescription>
+          The monster is in one of these moods. You are not told which.
+        </CardDescription>
+      </CardHeader>
+      <CardContent>
+        <div className="grid gap-2 sm:grid-cols-2">
+          <div className="rounded-lg bg-rose-500/15 p-3 text-sm leading-6">
+            <p className="font-semibold text-rose-100">Alert — noticed the class</p>
+            <p className="text-muted-foreground">{alertMoodLine(props.trait)}</p>
+          </div>
+          <div className="rounded-lg bg-emerald-500/15 p-3 text-sm leading-6">
+            <p className="font-semibold text-emerald-100">Calm — did not notice you</p>
+            <p className="text-muted-foreground">{calmMoodLine()}</p>
+          </div>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
+export function ClueFactsCard(props: {
   clueId: string | null;
   priorNoticed: number | null;
   likelihoodIfNoticed: number | null;
@@ -113,23 +137,11 @@ export function StoryCard(props: {
 
   return (
     <Card className="border-amber-300/30">
-      <CardHeader>
-        <CardTitle>Two moods, one clue</CardTitle>
-        <CardDescription>
-          The monster is either Alert or Calm this round. You are not told which.
-        </CardDescription>
+      <CardHeader className="pb-3">
+        <CardTitle>The clue</CardTitle>
+        <CardDescription>Facts about this clue — not the answers.</CardDescription>
       </CardHeader>
       <CardContent className="space-y-3 text-sm leading-6">
-        <div className="grid gap-2 sm:grid-cols-2">
-          <div className="rounded-lg bg-rose-500/15 p-3">
-            <p className="font-semibold text-rose-100">Alert — noticed the class</p>
-            <p className="text-muted-foreground">{alertMoodLine(props.trait)}</p>
-          </div>
-          <div className="rounded-lg bg-emerald-500/15 p-3">
-            <p className="font-semibold text-emerald-100">Calm — did not notice you</p>
-            <p className="text-muted-foreground">{calmMoodLine()}</p>
-          </div>
-        </div>
         <div className="rounded-lg border border-amber-300/40 bg-amber-500/10 p-3">
           <p className="text-xs tracking-wide text-amber-200 uppercase">What you can see</p>
           <p className="text-lg font-semibold text-foreground">{sight.title}</p>
