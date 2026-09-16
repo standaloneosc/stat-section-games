@@ -9,11 +9,12 @@ export function useRoomState(options: {
   token?: string;
   hostToken?: string;
   enabled?: boolean;
+  initialState?: PublicRoomState | null;
 }) {
-  const { code, playerId, token, hostToken, enabled = true } = options;
-  const [state, setState] = useState<PublicRoomState | null>(null);
+  const { code, playerId, token, hostToken, enabled = true, initialState = null } = options;
+  const [state, setState] = useState<PublicRoomState | null>(initialState);
   const [error, setError] = useState<string | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(!initialState);
   const [connected, setConnected] = useState(false);
 
   const query = useMemo(() => {

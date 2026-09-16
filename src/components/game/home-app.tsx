@@ -2,11 +2,12 @@
 
 import { useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Button } from "@/components/ui/button";
+import { Button, buttonVariants } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { saveHostSession, savePlayerSession } from "@/lib/session";
+import { cn } from "@/lib/utils";
 
 export function HomeApp() {
   const router = useRouter();
@@ -97,24 +98,25 @@ export function HomeApp() {
             <CardDescription>Create a room code, then start, pause, and end rounds from the teacher desk.</CardDescription>
           </CardHeader>
           <CardContent>
-            <form className="space-y-3" onSubmit={(event) => void createRoom(event)}>
+            <form
+              className="space-y-3"
+              method="post"
+              action="/api/rooms"
+              onSubmit={(event) => void createRoom(event)}
+            >
               <div className="grid gap-2">
                 <Label htmlFor="host-name">Your name (optional)</Label>
                 <Input
                   id="host-name"
+                  name="name"
                   value={hostName}
                   placeholder="Ms. Park"
                   onChange={(event) => setHostName(event.target.value)}
                 />
               </div>
-              <Button
-                type="submit"
-                className="w-full"
-                disabled={busy !== null}
-                onClick={(event) => void createRoom(event)}
-              >
+              <button type="submit" className={cn(buttonVariants(), "w-full")} disabled={busy !== null}>
                 {busy === "host" ? "Creating…" : "Create room"}
-              </Button>
+              </button>
             </form>
           </CardContent>
         </Card>

@@ -1,5 +1,6 @@
 import { getRoom, subscribe, toPublicState } from "@/lib/game";
 import { noStore } from "@/lib/game/http";
+import { readHostTokenFromCookie } from "@/lib/host-cookie";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -16,7 +17,10 @@ export async function GET(
   const url = new URL(request.url);
   const playerId = url.searchParams.get("playerId") ?? undefined;
   const token = url.searchParams.get("token") ?? undefined;
-  const hostToken = url.searchParams.get("hostToken") ?? undefined;
+  const hostToken =
+    url.searchParams.get("hostToken") ??
+    readHostTokenFromCookie(request.headers.get("cookie"), code) ??
+    undefined;
 
   const encoder = new TextEncoder();
   let closed = false;

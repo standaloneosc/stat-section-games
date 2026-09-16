@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, type ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import Link from "next/link";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
@@ -10,23 +10,39 @@ import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { useCountdown, useRoomState } from "@/hooks/use-room";
 import type { GameConfig, PublicRoomState } from "@/lib/game";
-import { loadHostSession, loadPlayerSession, savePlayerSession } from "@/lib/session";
+import { loadHostSession, loadPlayerSession, saveHostSession, savePlayerSession } from "@/lib/session";
 import { GameBoard } from "./board";
 import { LeaderboardCard, TimerBar } from "./panels";
 import { ResultsScreen } from "./results-screen";
 
-export function HostApp(props: { code: string }) {
+export function HostApp(props: { code: string; cookieToken?: string | null; initialState?: PublicRoomState | null }) {
   const code = props.code.toUpperCase();
-  const [hostToken] = useState(() =>
-    typeof window === "undefined" ? null : loadHostSession(code)
-  );
+  const [hostToken, setHostToken] = useState<string | null>(props.cookieToken ?? null);
+  const [storageChecked, setStorageChecked] = useState(() => Boolean(props.cookieToken));
+
+  useEffect(() => {
+    if (hostToken) {
+      saveHostSession(code, hostToken);
+      setStorageChecked(true);
+      return;
+    }
+    const stored = loadHostSession(code);
+    if (stored) {
+      setHostToken(stored);
+    }
+    setStorageChecked(true);
+  }, [code, hostToken]);
   const { state, error, loading, connected, refresh } = useRoomState({
     code,
     hostToken: hostToken ?? undefined,
     enabled: Boolean(hostToken),
+    initialState: props.initialState ?? null,
   });
 
   if (!hostToken) {
+    if (!storageChecked) {
+      return <p className="p-6 text-muted-foreground">Loading the host desk…</p>;
+    }
     return <MissingHost code={code} />;
   }
 

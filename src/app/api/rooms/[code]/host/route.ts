@@ -11,6 +11,7 @@ import {
   type GameConfig,
 } from "@/lib/game";
 import { jsonError, noStore } from "@/lib/game/http";
+import { readHostTokenFromCookie } from "@/lib/host-cookie";
 
 export const dynamic = "force-dynamic";
 
@@ -29,7 +30,10 @@ export async function POST(
       action?: string;
       config?: Partial<GameConfig>;
     };
-    const hostToken = body.hostToken ?? "";
+    const hostToken =
+      body.hostToken ||
+      readHostTokenFromCookie(request.headers.get("cookie"), code) ||
+      "";
     switch (body.action) {
       case "start":
         startGame(room, hostToken);
