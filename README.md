@@ -1,10 +1,10 @@
-# Hide & Seek Probability
+# Stat Section Games
 
-A classroom game for teaching **conditional probability**, the **law of total probability**, and **Bayes' rule**. Players hide on a 3×3 board while one monster moves according to a public trait. Survival points are split with anyone who hid on the same square.
+Classroom probability games: **Hide & Seek** (LOTP, Bayes, congestion scoring) and **Coin Pattern Race** (pattern-before-pattern waiting probabilities). Local multiplayer, no accounts.
 
 Live: [https://stat-section-games.onrender.com](https://stat-section-games.onrender.com)
 
-This is a Next.js app with a server-authoritative in-memory room. Open it on a laptop, then join from other browser tabs. There are no accounts and no matchmaking. Rooms live in one Node process, so a host like Render (long-running `next start`) is required.
+This is a Next.js app with server-authoritative in-memory rooms. Open it on a laptop, then join from other browser tabs. Rooms live in one Node process, so a host like Render (long-running `next start`) is required.
 
 ## Run locally
 
@@ -16,61 +16,75 @@ npm run dev
 
 Then open [http://127.0.0.1:43147](http://127.0.0.1:43147). Production (`npm start`) binds `0.0.0.0` on `${PORT:-43147}`.
 
-## How to play
+## Routes
 
-### Host / teacher
+| | Hide & Seek | Coin Pattern Race |
+| --- | --- | --- |
+| Home / picker | [`/`](/) | [`/`](/) |
+| Game hub | [`/hide-and-seek`](/hide-and-seek) | [`/coin-race`](/coin-race) |
+| Host desk | [`/room/CODE/host`](/room/CODE/host) | [`/coin-race/room/CODE/host`](/coin-race/room/CODE/host) |
+| Player | [`/room/CODE`](/room/CODE) | [`/coin-race/room/CODE`](/coin-race/room/CODE) |
+| Practice | [`/practice`](/practice) | [`/coin-race/practice`](/coin-race/practice) |
 
-1. Click **Create room** on the home page.
-2. Share the four-character code or `/room/CODE` link.
-3. Optionally set round length (default 240 seconds), trait, Bayes, **Alert percents** (default P(Alert) 40%, P(warning | Alert) 80%, P(warning | Calm) 20%), spoiler percents, and leaderboard.
-4. Use **Demo timing (45s)** before starting if you do not want a four-minute decision window.
-5. **Start game**, then **Pause**, **Resume**, **End round now**, **Next round**, or **End game**.
-6. Keep the host tab on `/room/CODE/host`. Host controls stay on the browser that created the room. Alert percents live in **Classroom rules** on that page and can be changed for the upcoming round, or the current round while students are still choosing.
+Create-room forms work without client JavaScript: they POST to the API and set a host cookie.
 
-Create room works without client JavaScript: the form posts to `/api/rooms` and sets a host cookie.
+## Coin Pattern Race
+
+Players see two equal-length patterns, such as HHT and THT, plus any flips so far. A fair coin is flipped until one pattern appears as consecutive faces. The graded answer is **P(this pattern appears before the other | current suffix)**, from a suffix/state chain — not P(the next three flips equal that pattern).
+
+Round 1 is HHT vs THT after a leading **H**, so P(HHT first) = **75%** and P(THT first) = **25%**. Naive next-three-flips would be 12.5% each.
+
+### Host
+
+1. Open **Coin Pattern Race** from the home picker, then **Create room**.
+2. Share `/coin-race/room/CODE`.
+3. On `/coin-race/room/CODE/host`, set **Scoring config** (defaults: 180s, 100/100/50, Bayes off, tie tolerance 0.01). Bayes mode: off / every round / every third round / final round only.
+4. Click **Start game** after at least one player joins. Then **Pause**, **Resume**, **End round now**, **Next round**, or **End game**.
+5. True win probabilities stay hidden until submissions close. The random race winner is shown on results but does **not** decide correct-choice points.
 
 ### Players
 
-1. Open `/room/CODE` in another tab (or Join from home).
-2. Enter a display name.
-3. When the round starts, look at the lightbulb (on = warning, off = quiet).
-4. Update how likely the monster noticed the class, pick a highlighted legal square, and estimate the hit chance. Corners are off for a Walker in the center.
-5. Enter percents (type `20` for 20%, not `0.20`).
-6. Lock in before the timer ends. Late players get a random legal square and no probability bonus.
+1. Join `/coin-race/room/CODE` with a display name.
+2. Choose Pattern A or B, enter P(your pattern first) as a percent (`75` not `0.75`), and lock in. Speed points use the server timestamp of that complete submission.
+3. On a Bayes round, also enter P(biased coin | observed flips). Prior 50/50; fair P(H)=50%; biased P(H)=75%. Example: P(B | HT) = 3/7.
 
-The player board does **not** show worked calculations or true square percents. Host and practice score against the true values after lock-in.
+### Scoring (max 250, or 300 with Bayes)
 
-Player counts and other people's squares stay hidden until the results screen.
+| Category | Default max |
+| --- | --- |
+| Correct choice | 100 |
+| Probability accuracy | 100 |
+| Speed | 50 |
+| Bayes bonus | 0 or 50 |
 
-### Practice
+Example: choose HHT, q = 0.70, submit at 90s of 180s, no Bayes → 100 + 80 + 25 = **205**, even if THT happens to appear first.
 
-`/practice` is a single-player version of the same math. Leave true hit percents off to work by hand. The clue / two moods switch is on by default. Round setup has the same Alert percent fields as the host desk.
+Results list each category separately.
 
-## What the first round looks like
+## Hide & Seek
 
-Round 1 is a Walker in the **center** `(1,1)` — five legal squares (stay plus the four sides). Corners are out of range.
+Players hide on a 3×3 board while one monster moves according to a public trait. Survival points split with anyone who hid on the same square.
 
-| Mode | How often | Where it goes |
-| --- | --- | --- |
-| Stay | 20% | stays on the current square |
-| Horizontal | 30% | left or right, equally |
-| Vertical | 30% | up or down, equally |
-| Wander | 20% | stay or any orthogonal neighbor, equally |
+### Host / teacher
 
-Students add those Calm modes themselves (LOTP). If Alert (angry), the Walker hunts the middle on the same five squares: Stay 60%, each side 10%. Those are P(square | Alert), not P(hit | clue). Students mix Alert vs Calm after Bayes. Teachers can check mixed hit answers (`P(left) = 0.19` Calm-only, or the posterior mix) after lock-in — those answers are not printed on the player board.
+1. Open **Hide & Seek** from the home picker (or `/hide-and-seek`) and **Create room**.
+2. Share `/room/CODE`.
+3. Optionally set round length (default 240 seconds), trait, Bayes, **Alert percents** (default P(Alert) 40%, P(warning | Alert) 80%, P(warning | Calm) 20%), spoiler percents, and leaderboard.
+4. **Start game**, then **Pause**, **Resume**, **End round now**, **Next round**, or **End game**. Host tab stays on `/room/CODE/host`.
 
-Every round has two hidden moods unless the host turns the clue off:
+### Players
 
-- **Alert** — it noticed the class and hunts the middle
-- **Calm** — it did not notice you and mixes Stay / Horizontal / Vertical / Wander
+1. Open `/room/CODE`, enter a name.
+2. Use the lightbulb (on = warning, off = quiet), the Calm and Alert tables, and the facts box (current host percents, not hardcoded 40/80/20).
+3. Pick a legal square, enter percents, lock in.
 
-The observation is a large lightbulb: on is a warning, off is quiet. Bayes facts sit next to it and show the **current** host percents (default notices 40% before any clue; 80%/20% for light on given Alert vs Calm). They calculate P(Alert | this clue), then P(hit this square). The player board does not print the posterior or the true hit percents.
-
-## Scoring
+### Scoring
 
 - Survival: `100 / (1 + other players on your square)` if you live, otherwise 0
-- Probability bonus: up to 20 points for closeness to the true hit probability, even if you are caught
+- Probability bonus: up to 20 points for closeness to the true hit probability
 - Bayes bonus: the same closeness rule on `P(noticed | clue)`
+
+Round 1 is a Walker in the center: Calm LOTP `P(left)=0.19`, `P(center)=0.24`. Alert hunts the middle (60% stay / 10% each side).
 
 ## Tests
 
@@ -78,7 +92,9 @@ The observation is a large lightbulb: on is a warning, off is quiet. Bayes facts
 npm test
 ```
 
-Covers neighbor generation, Walker-center LOTP 0.19/0.24, Bayes 0.40/0.80/0.20 → ≈0.7273, hunt-center weights, edge renormalization, congestion payouts, calibration bonuses, hidden information before resolution, late submissions, and reconnect.
+Hide-and-seek: neighbor generation, Walker-center LOTP, Bayes 0.40/0.80/0.20, congestion, hidden information.
+
+Coin Pattern Race: HHT vs THT → 0.75/0.25 from suffix H; scoring 205; Bayes P(B|HT)=3/7; ties; probability points table; speed at 90s of 180s = 25.
 
 ## Notes
 

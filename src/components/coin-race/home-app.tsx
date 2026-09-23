@@ -7,10 +7,10 @@ import { Button, buttonVariants } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { saveHostSession, savePlayerSession } from "@/lib/session";
+import { saveCoinRaceHostSession, saveCoinRacePlayerSession } from "@/lib/session";
 import { cn } from "@/lib/utils";
 
-export function HomeApp() {
+export function CoinRaceHomeApp() {
   const router = useRouter();
   const [hostName, setHostName] = useState("");
   const [joinName, setJoinName] = useState("");
@@ -26,7 +26,7 @@ export function HomeApp() {
     setBusy("host");
     setError(null);
     try {
-      const response = await fetch("/api/rooms", {
+      const response = await fetch("/api/coin-race/rooms", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ name: hostName || "Host" }),
@@ -35,7 +35,7 @@ export function HomeApp() {
       if (!response.ok) {
         throw new Error(data.error ?? "Could not create a room.");
       }
-      saveHostSession(data.code, data.hostToken);
+      saveCoinRaceHostSession(data.code, data.hostToken);
       router.push(data.hostPath);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Could not create a room.");
@@ -53,7 +53,7 @@ export function HomeApp() {
     setError(null);
     const code = joinCode.trim().toUpperCase();
     try {
-      const response = await fetch(`/api/rooms/${code}/join`, {
+      const response = await fetch(`/api/coin-race/rooms/${code}/join`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ name: joinName }),
@@ -62,12 +62,12 @@ export function HomeApp() {
       if (!response.ok) {
         throw new Error(data.error ?? "Could not join that room.");
       }
-      savePlayerSession(code, {
+      saveCoinRacePlayerSession(code, {
         playerId: data.playerId,
         token: data.token,
         name: data.name,
       });
-      router.push(`/room/${code}`);
+      router.push(`/coin-race/room/${code}`);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Could not join.");
     } finally {
@@ -83,15 +83,15 @@ export function HomeApp() {
           <Link href="/" className="hover:underline">
             Stat section games
           </Link>
-          {" · "}Hide &amp; Seek
+          {" · "}Coin Pattern Race
         </p>
         <h1 className="max-w-3xl text-4xl font-semibold tracking-tight text-balance sm:text-5xl">
-          Hide from the monster. Divide the reward. Show your work.
+          Which pattern appears first?
         </h1>
         <p className="max-w-2xl text-base leading-7 text-muted-foreground">
-          A 3×3 hide-and-seek game for teaching the law of total probability and Bayes&apos; rule.
-          Players hide on legal squares while a Walker, Spider, or Hunter moves locally. Survival
-          points split with anyone who picked the same square.
+          Two target strings race on a fair coin. Overlaps matter: the answer is the probability
+          that one pattern appears before the other, not the chance it shows up in the next three
+          flips. Optional Bayes questions ask for P(biased coin | observed flips).
         </p>
       </header>
 
@@ -101,19 +101,21 @@ export function HomeApp() {
         <Card>
           <CardHeader>
             <CardTitle>Host a class</CardTitle>
-            <CardDescription>Create a room code, then start, pause, and end rounds from the teacher desk.</CardDescription>
+            <CardDescription>
+              Create a room, set scoring, then start, pause, and end rounds from the teacher desk.
+            </CardDescription>
           </CardHeader>
           <CardContent>
             <form
               className="space-y-3"
               method="post"
-              action="/api/rooms"
+              action="/api/coin-race/rooms"
               onSubmit={(event) => void createRoom(event)}
             >
               <div className="grid gap-2">
-                <Label htmlFor="host-name">Your name (optional)</Label>
+                <Label htmlFor="cpr-host-name">Your name (optional)</Label>
                 <Input
-                  id="host-name"
+                  id="cpr-host-name"
                   name="name"
                   value={hostName}
                   placeholder="Ms. Park"
@@ -130,14 +132,14 @@ export function HomeApp() {
         <Card>
           <CardHeader>
             <CardTitle>Join a room</CardTitle>
-            <CardDescription>Use the four-character code on the board. Open each player in its own tab.</CardDescription>
+            <CardDescription>Use the four-character code on the board.</CardDescription>
           </CardHeader>
           <CardContent>
             <form className="space-y-3" onSubmit={(event) => void joinRoom(event)}>
               <div className="grid gap-2">
-                <Label htmlFor="join-name">Display name</Label>
+                <Label htmlFor="cpr-join-name">Display name</Label>
                 <Input
-                  id="join-name"
+                  id="cpr-join-name"
                   value={joinName}
                   placeholder="Jordan"
                   onChange={(event) => setJoinName(event.target.value)}
@@ -145,9 +147,9 @@ export function HomeApp() {
                 />
               </div>
               <div className="grid gap-2">
-                <Label htmlFor="code">Room code</Label>
+                <Label htmlFor="cpr-code">Room code</Label>
                 <Input
-                  id="code"
+                  id="cpr-code"
                   value={joinCode}
                   placeholder="K7MP"
                   className="uppercase"
@@ -159,7 +161,6 @@ export function HomeApp() {
                 type="submit"
                 className="w-full"
                 disabled={busy !== null || joinName.trim().length < 1 || joinCode.trim().length < 4}
-                onClick={(event) => void joinRoom(event)}
               >
                 {busy === "join" ? "Joining…" : "Join"}
               </Button>
@@ -170,13 +171,13 @@ export function HomeApp() {
         <Card>
           <CardHeader>
             <CardTitle>Practice alone</CardTitle>
-            <CardDescription>Work one LOTP or Bayes round with optional hints and no congestion from classmates.</CardDescription>
+            <CardDescription>One pattern race, scored by the server after you lock in.</CardDescription>
           </CardHeader>
           <CardContent className="space-y-3">
             <p className="text-sm text-muted-foreground">
-              Same monster math, one player, scored by the server.
+              First practice round is HHT vs THT after a leading H — P(HHT first) = 75%.
             </p>
-            <Button className="w-full" variant="secondary" onClick={() => router.push("/practice")}>
+            <Button className="w-full" variant="secondary" onClick={() => router.push("/coin-race/practice")}>
               Open practice
             </Button>
           </CardContent>

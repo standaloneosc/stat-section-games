@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import type { ReactNode } from "react";
 import { Geist, Geist_Mono } from "next/font/google";
 import { Toaster } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -15,12 +16,12 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Hide & Seek Probability",
+  title: "Stat Section Games",
   description:
-    "A classroom hide-and-seek game for the law of total probability, Bayes' rule, and congestion-aware expected payoff.",
+    "Classroom probability games: hide-and-seek on a 3×3 board, and a coin pattern race for suffix-state waiting probabilities and Bayes.",
 };
 
-export default function RootLayout({ children }: LayoutProps<"/">) {
+export default function RootLayout({ children }: { children: ReactNode }) {
   return (
     <html
       lang="en"
