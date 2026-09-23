@@ -18,8 +18,10 @@ export type {
 } from "./types";
 export {
   DEFAULT_PATTERN_PAIRS,
+  allPatternsOfLength,
   patternWinProbabilities,
   pickPatternPair,
+  sampleRound,
   simulateRace,
 } from "./patterns";
 export {

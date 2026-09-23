@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  createInternalRound,
   createRoom,
   joinRoom,
   resolveRound,
@@ -14,9 +15,10 @@ describe("coin race public state", () => {
     const { room } = createRoom({ hostName: "Ms. Park" });
     const { player, token } = joinRoom({ code: room.code, name: "Ava" });
     startGame(room, room.hostToken);
-    expect(room.round?.patternA).toBe("HHT");
-    expect(room.round?.patternB).toBe("THT");
-    expect(room.round?.patternAProbability).toBeCloseTo(0.75, 8);
+    expect(room.round?.patternA).toMatch(/^[HT]{2,3}$/);
+    expect(room.round?.patternB).toMatch(/^[HT]{2,3}$/);
+    expect(room.round?.patternA).not.toBe(room.round?.patternB);
+    expect(room.round?.suffix).toMatch(/^$|^[HT]$/);
     const view = toPublicState({
       room,
       playerId: player.id,
@@ -25,8 +27,8 @@ describe("coin race public state", () => {
     const json = JSON.stringify(view);
     expect(view.round?.phase).toBe("choosing");
     expect(view.round?.resolved).toBeNull();
-    expect(json).not.toContain("0.75");
     expect(json).not.toContain("patternAProbability");
+    expect(json).not.toContain("patternBProbability");
     expect(json).not.toMatch(/correctChoice":"A"/);
   });
 
@@ -37,7 +39,12 @@ describe("coin race public state", () => {
     });
     const { player, token } = joinRoom({ code: room.code, name: "Ben" });
     startGame(room, room.hostToken);
-    const round = room.round!;
+    room.round = createInternalRound(room.config, 1, Math.random, {
+      patternA: "HHT",
+      patternB: "THT",
+      suffix: "H",
+    });
+    const round = room.round;
     round.startedAt = "2026-09-23T18:00:00.000Z";
     round.deadline = "2026-09-23T18:03:00.000Z";
     submitChoice({

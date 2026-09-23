@@ -88,8 +88,9 @@ export function CoinRacePracticeApp() {
         <CardHeader>
           <CardTitle>Round setup</CardTitle>
           <CardDescription>
-            Round 1 is HHT vs THT after a leading H. The true split is 75% / 25% — not 12.5% each
-            from looking only at the next three flips. Leave Bayes off unless you want P(biased | HT).
+            Each round picks two distinct patterns of length 2 or 3, then either a blank history or
+            a single leading H/T. Win probabilities are P(A before B | that suffix), not the next
+            few flips. Leave Bayes off unless you want P(biased coin | observed flips).
           </CardDescription>
         </CardHeader>
         <CardContent className="flex flex-wrap items-end gap-4">

@@ -175,7 +175,8 @@ export function CoinRaceHomeApp() {
           </CardHeader>
           <CardContent className="space-y-3">
             <p className="text-sm text-muted-foreground">
-              First practice round is HHT vs THT after a leading H — P(HHT first) = 75%.
+              Each round samples two- or three-letter patterns, sometimes with a leading H or T and
+              sometimes from a blank history.
             </p>
             <Button className="w-full" variant="secondary" onClick={() => router.push("/coin-race/practice")}>
               Open practice

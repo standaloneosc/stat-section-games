@@ -157,19 +157,67 @@ export function simulateRace(
   throw new Error("Coin race did not finish.");
 }
 
-export const DEFAULT_PATTERN_PAIRS: Array<{ patternA: string; patternB: string; suffix: string }> = [
-  { patternA: "HHT", patternB: "THT", suffix: "H" },
-  { patternA: "HHH", patternB: "THH", suffix: "" },
-  { patternA: "HTH", patternB: "HHT", suffix: "HT" },
-  { patternA: "HTT", patternB: "HHT", suffix: "" },
-  { patternA: "TTH", patternB: "HTT", suffix: "T" },
-  { patternA: "THH", patternB: "HHT", suffix: "" },
-];
+export function allPatternsOfLength(length: 2 | 3): string[] {
+  if (length === 2) {
+    return ["HH", "HT", "TH", "TT"];
+  }
+  return ["HHH", "HHT", "HTH", "HTT", "THH", "THT", "TTH", "TTT"];
+}
 
-export function pickPatternPair(roundNumber: number): {
+export type SampledRound = {
   patternA: string;
   patternB: string;
   suffix: string;
-} {
+};
+
+function pickIndex(rng: () => number, count: number): number {
+  if (count <= 0) return 0;
+  return Math.min(count - 1, Math.floor(rng() * count));
+}
+
+function pickDistinctPair(length: 2 | 3, rng: () => number): { patternA: string; patternB: string } {
+  const patterns = allPatternsOfLength(length);
+  const i = pickIndex(rng, patterns.length);
+  let j = pickIndex(rng, patterns.length - 1);
+  if (j >= i) j += 1;
+  return { patternA: patterns[i]!, patternB: patterns[j]! };
+}
+
+/** True if this start is usable: both patterns still have a chance. */
+export function roundIsPlayable(patternA: string, patternB: string, suffix: string): boolean {
+  try {
+    const { pA, pB } = patternWinProbabilities(patternA, patternB, { suffix });
+    return pA > 1e-9 && pB > 1e-9;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Sample a classroom round:
+ * - length 2 or 3 (about one third are two-letter pairs);
+ * - empty suffix, or a single random first flip H/T.
+ * Rejects starts that already finish a pattern or make one side impossible.
+ */
+export function sampleRound(rng: () => number = Math.random): SampledRound {
+  for (let attempt = 0; attempt < 80; attempt += 1) {
+    const length: 2 | 3 = rng() < 1 / 3 ? 2 : 3;
+    const { patternA, patternB } = pickDistinctPair(length, rng);
+    const suffix = rng() < 0.5 ? "" : rng() < 0.5 ? "H" : "T";
+    if (roundIsPlayable(patternA, patternB, suffix)) {
+      return { patternA, patternB, suffix };
+    }
+  }
+  return { patternA: "HHT", patternB: "THT", suffix: "" };
+}
+
+/** @deprecated Use sampleRound. Kept as documented examples. */
+export const DEFAULT_PATTERN_PAIRS: SampledRound[] = [
+  { patternA: "HHT", patternB: "THT", suffix: "" },
+  { patternA: "HHT", patternB: "THT", suffix: "H" },
+  { patternA: "HT", patternB: "TH", suffix: "" },
+];
+
+export function pickPatternPair(roundNumber: number): SampledRound {
   return DEFAULT_PATTERN_PAIRS[(roundNumber - 1) % DEFAULT_PATTERN_PAIRS.length]!;
 }

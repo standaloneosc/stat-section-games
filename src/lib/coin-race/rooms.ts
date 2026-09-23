@@ -1,6 +1,6 @@
 import { GameError } from "@/lib/game";
 import { coinTypePosterior, pickBayesObservation, roundHasBayes } from "./bayes";
-import { patternWinProbabilities, pickPatternPair, simulateRace } from "./patterns";
+import { patternWinProbabilities, sampleRound, simulateRace, type SampledRound } from "./patterns";
 import {
   calculateBayesBonus,
   calculateCorrectChoice,
@@ -250,12 +250,13 @@ export function updateConfig(
 export function createInternalRound(
   config: CoinRaceConfig,
   roundNumber: number,
-  rng: () => number = Math.random
+  rng: () => number = Math.random,
+  pair?: SampledRound
 ): InternalRound {
-  const pair = pickPatternPair(roundNumber);
-  const { pA, pB } = patternWinProbabilities(pair.patternA, pair.patternB, {
+  const chosen = pair ?? sampleRound(rng);
+  const { pA, pB } = patternWinProbabilities(chosen.patternA, chosen.patternB, {
     pHeads: FAIR_P_HEADS,
-    suffix: pair.suffix,
+    suffix: chosen.suffix,
   });
   const bayesEnabled = roundHasBayes(config.bayesMode, roundNumber, config.roundCount);
   const bayesObservation = bayesEnabled ? pickBayesObservation(roundNumber) : null;
@@ -266,9 +267,9 @@ export function createInternalRound(
   const deadline = new Date(Date.now() + config.decisionTimeSeconds * 1000).toISOString();
   return {
     roundNumber,
-    patternA: pair.patternA,
-    patternB: pair.patternB,
-    suffix: pair.suffix,
+    patternA: chosen.patternA,
+    patternB: chosen.patternB,
+    suffix: chosen.suffix,
     pHeads: FAIR_P_HEADS,
     patternAProbability: pA,
     patternBProbability: pB,
@@ -296,7 +297,7 @@ export function startGame(room: CoinRaceRoom, hostToken: string): void {
   for (const player of room.players.values()) {
     player.score = 0;
   }
-  room.round = createInternalRound(room.config, 1);
+  room.round = createInternalRound(room.config, 1, Math.random);
   broadcastState(room);
 }
 

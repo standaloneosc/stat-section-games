@@ -30,9 +30,14 @@ Create-room forms work without client JavaScript: they POST to the API and set a
 
 ## Coin Pattern Race
 
-Players see two equal-length patterns, such as HHT and THT, plus any flips so far. A fair coin is flipped until one pattern appears as consecutive faces. The graded answer is **P(this pattern appears before the other | current suffix)**, from a suffix/state chain — not P(the next three flips equal that pattern).
+Players see two equal-length patterns (2 or 3 letters), such as HHT vs THT or HT vs TH, plus any flips so far. A fair coin is flipped until one pattern appears as consecutive faces. The graded answer is **P(this pattern appears before the other | current suffix)**, from a suffix/state chain — not P(the next few flips equal that pattern).
 
-Round 1 is HHT vs THT after a leading **H**, so P(HHT first) = **75%** and P(THT first) = **25%**. Naive next-three-flips would be 12.5% each.
+Each round is sampled independently:
+
+- **About two thirds** use length-3 patterns; **about one third** use length-2 pairs (HT vs TH, HH vs HT, TT vs TH, …).
+- **Half** start from a **blank history**; **half** show a **random first flip** H or T. Starts that already finish a pattern or make one side impossible are redrawn.
+
+Examples: HHT vs THT from empty → 62.5%/37.5%; HHT vs THT after **H** → 75%/25%; HT vs TH from empty → 50%/50%.
 
 ### Host
 
