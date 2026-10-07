@@ -8,6 +8,10 @@ export function coinRaceHostCookieName(code: string): string {
   return `cpr_host_${code.toUpperCase()}`;
 }
 
+export function bettingHostCookieName(code: string): string {
+  return `qbg_host_${code.toUpperCase()}`;
+}
+
 function cookieHeader(name: string, token: string): string {
   return `${name}=${encodeURIComponent(token)}; Path=/; Max-Age=${HOST_COOKIE_MAX_AGE}; SameSite=Lax; HttpOnly`;
 }
@@ -18,6 +22,10 @@ export function hostCookieHeader(code: string, token: string): string {
 
 export function coinRaceHostCookieHeader(code: string, token: string): string {
   return cookieHeader(coinRaceHostCookieName(code), token);
+}
+
+export function bettingHostCookieHeader(code: string, token: string): string {
+  return cookieHeader(bettingHostCookieName(code), token);
 }
 
 function readNamedCookie(cookieHeader: string | null | undefined, target: string): string | null {
@@ -47,4 +55,11 @@ export function readCoinRaceHostTokenFromCookie(
   code: string
 ): string | null {
   return readNamedCookie(cookieHeader, coinRaceHostCookieName(code));
+}
+
+export function readBettingHostTokenFromCookie(
+  cookieHeader: string | null | undefined,
+  code: string
+): string | null {
+  return readNamedCookie(cookieHeader, bettingHostCookieName(code));
 }

@@ -11,12 +11,12 @@ export default function HomePage() {
           Stat section games
         </h1>
         <p className="max-w-2xl text-base leading-7 text-muted-foreground">
-          Two local-multiplayer games for a probability classroom. No accounts. Create a room on
+          Three local-multiplayer games for a probability classroom. No accounts. Create a room on
           the teacher laptop, then join from student tabs.
         </p>
       </header>
 
-      <div className="grid gap-4 md:grid-cols-2">
+      <div className="grid gap-4 md:grid-cols-3">
         <Card>
           <CardHeader>
             <CardTitle>Hide &amp; Seek</CardTitle>
@@ -48,6 +48,24 @@ export default function HomePage() {
               <Button>Open coin pattern race</Button>
             </Link>
             <Link href="/coin-race/practice">
+              <Button variant="secondary">Practice</Button>
+            </Link>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle>Question betting</CardTitle>
+            <CardDescription>
+              Fifteen interview questions. Each group starts at 10,000, sees the multiplier (2x–4x)
+              on the question, then bets. Correct pays bet × multiplier.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="flex flex-wrap gap-2">
+            <Link href="/betting">
+              <Button>Open question betting</Button>
+            </Link>
+            <Link href="/betting/practice">
               <Button variant="secondary">Practice</Button>
             </Link>
           </CardContent>

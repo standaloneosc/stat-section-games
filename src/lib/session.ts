@@ -2,6 +2,8 @@ const HOST_PREFIX = "hide-seek:host:";
 const PLAYER_PREFIX = "hide-seek:player:";
 const COIN_HOST_PREFIX = "coin-race:host:";
 const COIN_PLAYER_PREFIX = "coin-race:player:";
+const BETTING_HOST_PREFIX = "betting:host:";
+const BETTING_PLAYER_PREFIX = "betting:player:";
 
 export type PlayerSession = {
   playerId: string;
@@ -51,6 +53,30 @@ export function saveCoinRacePlayerSession(code: string, session: PlayerSession) 
 
 export function loadCoinRacePlayerSession(code: string): PlayerSession | null {
   const raw = localStorage.getItem(COIN_PLAYER_PREFIX + code.toUpperCase());
+  if (!raw) {
+    return null;
+  }
+  try {
+    return JSON.parse(raw) as PlayerSession;
+  } catch {
+    return null;
+  }
+}
+
+export function saveBettingHostSession(code: string, hostToken: string) {
+  localStorage.setItem(BETTING_HOST_PREFIX + code.toUpperCase(), hostToken);
+}
+
+export function loadBettingHostSession(code: string): string | null {
+  return localStorage.getItem(BETTING_HOST_PREFIX + code.toUpperCase());
+}
+
+export function saveBettingPlayerSession(code: string, session: PlayerSession) {
+  localStorage.setItem(BETTING_PLAYER_PREFIX + code.toUpperCase(), JSON.stringify(session));
+}
+
+export function loadBettingPlayerSession(code: string): PlayerSession | null {
+  const raw = localStorage.getItem(BETTING_PLAYER_PREFIX + code.toUpperCase());
   if (!raw) {
     return null;
   }

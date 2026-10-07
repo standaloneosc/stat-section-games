@@ -18,7 +18,7 @@ const geistMono = Geist_Mono({
 export const metadata: Metadata = {
   title: "Stat Section Games",
   description:
-    "Classroom probability games: hide-and-seek on a 3×3 board, and a coin pattern race for suffix-state waiting probabilities and Bayes.",
+    "Classroom probability games: hide-and-seek, a coin pattern race, and interview-question betting.",
 };
 
 export default function RootLayout({ children }: { children: ReactNode }) {

@@ -1,6 +1,6 @@
 # Stat Section Games
 
-Classroom probability games: **Hide & Seek** (LOTP, Bayes, congestion scoring) and **Coin Pattern Race** (pattern-before-pattern waiting probabilities). Local multiplayer, no accounts.
+Classroom probability games: **Hide & Seek** (LOTP, Bayes, congestion scoring), **Coin Pattern Race** (pattern-before-pattern waiting probabilities), and **Question betting** (interview problems with 2x–4x stakes). Local multiplayer, no accounts.
 
 Live: [https://stat-section-games.onrender.com](https://stat-section-games.onrender.com)
 
@@ -18,13 +18,13 @@ Then open [http://127.0.0.1:43147](http://127.0.0.1:43147). Production (`npm sta
 
 ## Routes
 
-| | Hide & Seek | Coin Pattern Race |
-| --- | --- | --- |
-| Home / picker | [`/`](/) | [`/`](/) |
-| Game hub | [`/hide-and-seek`](/hide-and-seek) | [`/coin-race`](/coin-race) |
-| Host desk | [`/room/CODE/host`](/room/CODE/host) | [`/coin-race/room/CODE/host`](/coin-race/room/CODE/host) |
-| Player | [`/room/CODE`](/room/CODE) | [`/coin-race/room/CODE`](/coin-race/room/CODE) |
-| Practice | [`/practice`](/practice) | [`/coin-race/practice`](/coin-race/practice) |
+| | Hide & Seek | Coin Pattern Race | Question betting |
+| --- | --- | --- | --- |
+| Home / picker | [`/`](/) | [`/`](/) | [`/`](/) |
+| Game hub | [`/hide-and-seek`](/hide-and-seek) | [`/coin-race`](/coin-race) | [`/betting`](/betting) |
+| Host desk | [`/room/CODE/host`](/room/CODE/host) | [`/coin-race/room/CODE/host`](/coin-race/room/CODE/host) | [`/betting/room/CODE/host`](/betting/room/CODE/host) |
+| Player | [`/room/CODE`](/room/CODE) | [`/coin-race/room/CODE`](/coin-race/room/CODE) | [`/betting/room/CODE`](/betting/room/CODE) |
+| Practice | [`/practice`](/practice) | [`/coin-race/practice`](/coin-race/practice) | [`/betting/practice`](/betting/practice) |
 
 Create-room forms work without client JavaScript: they POST to the API and set a host cookie.
 
@@ -91,6 +91,24 @@ Players hide on a 3×3 board while one monster moves according to a public trait
 
 Round 1 is a Walker in the center: Calm LOTP `P(left)=0.19`, `P(center)=0.24`. Alert hunts the middle (60% stay / 10% each side).
 
+## Question betting
+
+Fifteen interview questions. Groups start at **10,000**. Before they bet they see the question’s multiplier as a large amber chip (**2x**, **2.5x**, **3x**, **3.5x**, or **4x**) on the player board, practice, host desk, and the question list. Correct: `balance − bet + bet × multiplier`. Wrong: lose the bet. Bet 0 is allowed. Max bet is `min(10,000, balance)`.
+
+### Host
+
+1. Open **Question betting**, **Create room**, share `/betting/room/CODE`.
+2. Groups join with a team name.
+3. On `/betting/room/CODE/host`, click **Start game** (question 1) or pick any row in the bank (each row shows its multiplier).
+4. **Pause** / **Resume**, **Reveal / lock** to grade and pay out, **Next question**, or **End game**.
+5. **Give or take points**: pick a group, enter a signed amount, apply. The live leaderboard is always on the desk.
+
+Distribution questions use a family dropdown (Bernoulli, Binomial, Geometric, Poisson, Hypergeometric, Uniform discrete, Normal, Exponential) plus only the parameters that family needs.
+
+### Practice
+
+`/betting/practice` uses a fake 10,000 and the same bank. Multipliers stay visible before lock-in.
+
 ## Tests
 
 ```bash
@@ -100,6 +118,8 @@ npm test
 Hide-and-seek: neighbor generation, Walker-center LOTP, Bayes 0.40/0.80/0.20, congestion, hidden information.
 
 Coin Pattern Race: HHT vs THT → 0.75/0.25 from suffix H; scoring 205; Bayes P(B|HT)=3/7; ties; probability points table; speed at 90s of 180s = 25.
+
+Question betting: payout 10k+1000 at 2.5x → 11500; keys 5/16, 2.45, 2.718, 14.7, 16/31, 2/3, 7/12, 84, Hypergeometric(20,7,5), Bin(n,1/3); multiplier published before lock-in.
 
 ## Notes
 
