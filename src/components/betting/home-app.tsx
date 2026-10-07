@@ -85,9 +85,9 @@ export function BettingHomeApp() {
           Bet on the answer
         </h1>
         <p className="max-w-2xl text-base leading-7 text-muted-foreground">
-          Fifteen interview probability questions. Each group starts at 10,000, chooses a bet, and
-          sees the multiplier — 2x through 4x — on the question before locking in. Correct pays
-          bet × multiplier. Wrong loses the bet.
+          Fifteen interview questions in a grid. Each cell shows its multiplier. Groups start at
+          10,000 and bet on any question while the host clock runs. Final score is the balance
+          when time hits zero.
         </p>
       </header>
 
@@ -98,8 +98,8 @@ export function BettingHomeApp() {
           <CardHeader>
             <CardTitle>Host a class</CardTitle>
             <CardDescription>
-              Create a room, open questions, reveal answers, and give or take points from the
-              teacher desk.
+              Set the time limit, start the clock, watch the live leaderboard, and give or take
+              points.
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -171,8 +171,8 @@ export function BettingHomeApp() {
           <CardHeader>
             <CardTitle>Practice alone</CardTitle>
             <CardDescription>
-              Work Oscar’s bank with a fake 10,000. Every question still shows its multiplier
-              before you bet.
+              Untimed grid with a fake 10,000. Every cell still shows its multiplier before you
+              bet.
             </CardDescription>
           </CardHeader>
           <CardContent>

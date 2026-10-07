@@ -57,9 +57,9 @@ export async function GET(
           hostToken,
         });
         send("heartbeat", {
-          remainingMs: state.current?.remainingMs ?? 0,
+          remainingMs: state.remainingMs,
           status: state.status,
-          phase: state.current?.phase ?? "waiting",
+          frozen: state.frozen,
         });
       }, 1000);
       const close = () => {

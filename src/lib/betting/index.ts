@@ -26,8 +26,8 @@ export type {
   BettingConfig,
   BettingRoom,
   PublicBettingState,
-  PublicCurrentQuestion,
-  PublicQuestionListItem,
+  PublicGridItem,
+  PublicYourResult,
 } from "./types";
 export {
   adjustBalance,
@@ -38,11 +38,9 @@ export {
   endGame,
   getRoom,
   joinRoom,
-  nextQuestion,
   pauseGame,
   resolvePractice,
   resumeGame,
-  revealQuestion,
   startGame,
   submitAnswer,
   subscribe,

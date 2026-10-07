@@ -9,10 +9,11 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { TimerBar } from "@/components/game/panels";
 import { useBettingState, useCountdown } from "@/hooks/use-betting";
-import { maxAllowedBet, type PlayerAnswer } from "@/lib/betting";
+import { maxAllowedBet, type PlayerAnswer, type PublicGridItem } from "@/lib/betting";
 import { loadBettingPlayerSession, saveBettingPlayerSession } from "@/lib/session";
 import { AnswerFields, BetField } from "./answer-fields";
 import { BettingLeaderboard, formatMoney } from "./leaderboard";
+import { QuestionGrid } from "./question-grid";
 import { QuestionPrompt } from "./question-prompt";
 
 export function BettingPlayerApp(props: { code: string }) {
@@ -23,6 +24,7 @@ export function BettingPlayerApp(props: { code: string }) {
   const [name, setName] = useState(session?.name ?? "");
   const [joinError, setJoinError] = useState<string | null>(null);
   const [joining, setJoining] = useState(false);
+  const [selectedId, setSelectedId] = useState<number | null>(null);
   const [answer, setAnswer] = useState<PlayerAnswer>({});
   const [bet, setBet] = useState("0");
   const [busy, setBusy] = useState(false);
@@ -34,11 +36,7 @@ export function BettingPlayerApp(props: { code: string }) {
     token: session?.token,
     enabled: Boolean(session),
   });
-  const remaining = useCountdown(
-    state?.current?.deadline,
-    state?.current?.remainingMs,
-    state?.current?.paused
-  );
+  const remaining = useCountdown(state?.deadline, state?.remainingMs, state?.paused);
 
   async function join(event?: React.FormEvent | React.MouseEvent) {
     event?.preventDefault();
@@ -68,8 +66,15 @@ export function BettingPlayerApp(props: { code: string }) {
     }
   }
 
-  async function lockIn() {
-    if (!session || !state?.current) return;
+  function pick(id: number) {
+    setSelectedId(id);
+    setAnswer({});
+    setBet("0");
+    setSubmitError(null);
+  }
+
+  async function lockIn(item: PublicGridItem) {
+    if (!session) return;
     setBusy(true);
     setSubmitError(null);
     try {
@@ -79,9 +84,9 @@ export function BettingPlayerApp(props: { code: string }) {
         body: JSON.stringify({
           playerId: session.playerId,
           token: session.token,
+          questionId: item.id,
           bet: Number(bet) || 0,
           answer,
-          confirm: true,
         }),
       });
       const data = await response.json();
@@ -133,13 +138,13 @@ export function BettingPlayerApp(props: { code: string }) {
     );
   }
 
-  const current = state.current;
+  const selected = state.grid.find((item) => item.id === selectedId) ?? null;
   const maxBet = maxAllowedBet(state.you?.balance ?? 0);
-  const locked = Boolean(state.you?.confirmed);
-  const choosing = current?.phase === "choosing" && !current.paused && state.status === "playing";
+  const open = state.status === "playing" && !state.paused && !state.frozen;
+  const totalMs = state.config.timeLimitSeconds * 1000;
 
   return (
-    <div className="mx-auto flex w-full max-w-5xl flex-col gap-4 p-4 pb-16">
+    <div className="mx-auto flex w-full max-w-6xl flex-col gap-4 p-4 pb-16">
       <header className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <p className="text-xs tracking-wide text-amber-200/80 uppercase">
@@ -148,6 +153,10 @@ export function BettingPlayerApp(props: { code: string }) {
           <h1 className="text-3xl font-semibold tracking-tight">
             Balance {formatMoney(state.you?.balance ?? 0)}
           </h1>
+          <p className="text-sm text-muted-foreground">
+            {state.you?.answeredCount ?? 0} of 15 locked in. Final score is this balance when time
+            runs out.
+          </p>
         </div>
         <Link href="/betting">
           <Button variant="ghost">Betting home</Button>
@@ -161,105 +170,89 @@ export function BettingPlayerApp(props: { code: string }) {
         </Alert>
       ) : null}
 
-      {state.status === "lobby" || !current ? (
+      {state.status === "lobby" ? (
         <Card>
           <CardHeader>
-            <CardTitle>Waiting for the host</CardTitle>
+            <CardTitle>Waiting for the host to start the clock</CardTitle>
             <CardDescription>
-              The teacher will open a question. Each item shows its payout multiplier before anyone
-              bets.
+              You can already see the full bank. Each cell shows its multiplier. Bets open when the
+              timer starts.
             </CardDescription>
           </CardHeader>
         </Card>
+      ) : (
+        <TimerBar
+          remainingMs={remaining}
+          totalMs={totalMs}
+          paused={state.paused}
+          label={state.frozen ? "Time is up — balances frozen" : "Round clock"}
+        />
+      )}
+
+      {state.frozen ? (
+        <Alert>
+          <AlertTitle>Final score: {formatMoney(state.you?.balance ?? 0)}</AlertTitle>
+          <AlertDescription>
+            Unanswered questions stay unanswered. The leaderboard below is the finish.
+          </AlertDescription>
+        </Alert>
       ) : null}
 
-      {current ? (
+      <QuestionGrid
+        items={state.grid}
+        selectedId={selectedId}
+        onSelect={pick}
+        disabled={!open && !state.frozen && state.status !== "lobby"}
+      />
+
+      {selected ? (
         <Card>
           <CardHeader>
-            <QuestionPrompt question={current} />
+            <QuestionPrompt question={selected} />
           </CardHeader>
           <CardContent className="space-y-4">
-            {current.phase === "choosing" ? (
+            {selected.yourResult ? (
+              <div className="space-y-1 text-sm">
+                <p>
+                  {selected.yourResult.correct ? "Correct." : "Incorrect."} This question paid{" "}
+                  <span className="font-mono font-semibold">{selected.multiplierLabel}</span>. Key:{" "}
+                  {selected.yourResult.correctKey}
+                </p>
+                <p>
+                  Bet {formatMoney(selected.yourResult.bet)}, change{" "}
+                  {selected.yourResult.delta >= 0 ? "+" : ""}
+                  {formatMoney(selected.yourResult.delta)}.
+                </p>
+              </div>
+            ) : open ? (
               <>
-                <TimerBar
-                  remainingMs={remaining}
-                  totalMs={state.config.decisionTimeSeconds * 1000}
-                  paused={current.paused}
-                  label="Time to lock in"
+                <AnswerFields kind={selected.kind} value={answer} onChange={setAnswer} disabled={busy} />
+                <BetField
+                  bet={bet}
+                  onChange={setBet}
+                  maxBet={maxBet}
+                  multiplierLabel={selected.multiplierLabel}
+                  disabled={busy}
                 />
-                {locked ? (
-                  <p className="text-sm text-muted-foreground">
-                    Locked in with a bet of {formatMoney(state.you?.bet ?? 0)}. Waiting for the host
-                    to reveal. This question still pays {current.multiplierLabel}.
-                  </p>
-                ) : (
-                  <>
-                    <AnswerFields
-                      kind={current.kind}
-                      value={answer}
-                      onChange={setAnswer}
-                      disabled={!choosing || busy}
-                    />
-                    <BetField
-                      bet={bet}
-                      onChange={setBet}
-                      maxBet={maxBet}
-                      multiplierLabel={current.multiplierLabel}
-                      disabled={!choosing || busy}
-                    />
-                    {submitError ? <p className="text-sm text-destructive">{submitError}</p> : null}
-                    <Button disabled={!choosing || busy} onClick={() => void lockIn()}>
-                      {busy ? "Locking in…" : "Lock in"}
-                    </Button>
-                  </>
-                )}
+                {submitError ? <p className="text-sm text-destructive">{submitError}</p> : null}
+                <Button disabled={busy} onClick={() => void lockIn(selected)}>
+                  {busy ? "Locking in…" : "Lock in"}
+                </Button>
               </>
             ) : (
-              <RevealedPanel
-                youId={state.you?.id}
-                multiplierLabel={current.multiplierLabel}
-                revealed={current.revealed}
-              />
+              <p className="text-sm text-muted-foreground">
+                {state.paused
+                  ? "Paused — wait for the host."
+                  : state.frozen
+                    ? "Time is up. You did not lock this one in."
+                    : "Waiting for the clock to start."}
+              </p>
             )}
           </CardContent>
         </Card>
       ) : null}
 
       <BettingLeaderboard rows={state.leaderboard} highlightId={state.you?.id} />
-    </div>
-  );
-}
-
-function RevealedPanel(props: {
-  youId?: string;
-  multiplierLabel: string;
-  revealed: {
-    correctKey: string;
-    results: Array<{
-      playerId: string;
-      correct: boolean;
-      bet: number;
-      delta: number;
-      missed: boolean;
-    }>;
-  } | null;
-}) {
-  const yours = props.revealed?.results.find((row) => row.playerId === props.youId);
-  return (
-    <div className="space-y-3 text-sm">
-      <p>
-        This question paid <span className="font-mono font-semibold">{props.multiplierLabel}</span>.
-        Key: <span className="font-medium">{props.revealed?.correctKey}</span>
-      </p>
-      {yours?.missed ? (
-        <p className="text-muted-foreground">No lock-in, so your balance did not change.</p>
-      ) : yours ? (
-        <p>
-          {yours.correct ? "Correct." : "Incorrect."} Bet {formatMoney(yours.bet)}, change{" "}
-          {yours.delta >= 0 ? "+" : ""}
-          {formatMoney(yours.delta)}.
-        </p>
-      ) : null}
     </div>
   );
 }

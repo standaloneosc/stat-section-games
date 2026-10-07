@@ -16,8 +16,8 @@ import {
   saveBettingHostSession,
   saveBettingPlayerSession,
 } from "@/lib/session";
-import { BettingLeaderboard, formatMoney, QuestionList } from "./leaderboard";
-import { QuestionPrompt } from "./question-prompt";
+import { BettingLeaderboard, formatMoney } from "./leaderboard";
+import { QuestionGrid } from "./question-grid";
 
 export function BettingHostApp(props: {
   code: string;
@@ -97,19 +97,21 @@ function HostDesk(props: {
   const [busy, setBusy] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const [joinName, setJoinName] = useState("Teacher");
-  const [seconds, setSeconds] = useState(String(state.config.decisionTimeSeconds));
+  const minutes = Math.max(0.5, state.config.timeLimitSeconds / 60);
+  const [limitMinutes, setLimitMinutes] = useState(String(minutes));
   const [adjustId, setAdjustId] = useState(state.players[0]?.id ?? "");
   const [adjustAmount, setAdjustAmount] = useState("500");
   const [adjustNote, setAdjustNote] = useState("");
-  const remaining = useCountdown(
-    state.current?.deadline,
-    state.current?.remainingMs,
-    state.current?.paused
-  );
+  const remaining = useCountdown(state.deadline, state.remainingMs, state.paused);
 
   async function hostAction(
     action: string,
-    extra?: { questionId?: number; playerId?: string; amount?: number; note?: string; config?: Partial<BettingConfig> }
+    extra?: {
+      playerId?: string;
+      amount?: number;
+      note?: string;
+      config?: Partial<BettingConfig>;
+    }
   ) {
     setBusy(action);
     setMessage(null);
@@ -153,7 +155,8 @@ function HostDesk(props: {
   }
 
   const origin = typeof window !== "undefined" ? window.location.origin : "";
-  const current = state.current;
+  const inLobby = state.status === "lobby";
+  const canTime = inLobby || state.status === "paused";
 
   return (
     <div className="mx-auto flex w-full max-w-6xl flex-col gap-4 p-4 pb-16">
@@ -194,107 +197,123 @@ function HostDesk(props: {
         </Alert>
       ) : null}
 
+      <Card>
+        <CardHeader>
+          <CardTitle>Round clock</CardTitle>
+          <CardDescription>
+            Set the time limit, then start. Groups may bet on any question until the clock hits zero.
+            Final score is their balance at freeze.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="flex flex-wrap items-end gap-3">
+            <div className="grid gap-2">
+              <Label htmlFor="time-limit">Time limit (minutes)</Label>
+              <Input
+                id="time-limit"
+                className="w-32"
+                value={limitMinutes}
+                disabled={!canTime}
+                onChange={(event) => setLimitMinutes(event.target.value)}
+              />
+            </div>
+            <Button
+              variant="outline"
+              disabled={busy !== null || !canTime}
+              onClick={() =>
+                void hostAction("update-config", {
+                  config: { timeLimitSeconds: Math.round(Number(limitMinutes) * 60) || 900 },
+                })
+              }
+            >
+              Save time limit
+            </Button>
+            <Button
+              variant="secondary"
+              disabled={busy !== null || !canTime}
+              onClick={() => {
+                setLimitMinutes("2");
+                void hostAction("update-config", { config: { timeLimitSeconds: 120 } });
+              }}
+            >
+              Demo 2 min
+            </Button>
+            <Button
+              variant="secondary"
+              disabled={busy !== null || !canTime}
+              onClick={() => {
+                setLimitMinutes("15");
+                void hostAction("update-config", { config: { timeLimitSeconds: 900 } });
+              }}
+            >
+              Class 15 min
+            </Button>
+          </div>
+          <p className="text-sm text-muted-foreground">
+            Current limit: {Math.round(state.config.timeLimitSeconds / 60)} min (
+            {state.config.timeLimitSeconds}s).
+          </p>
+          <div className="flex flex-wrap gap-2">
+            <Button
+              disabled={busy !== null || state.players.length < 1 || state.status !== "lobby"}
+              onClick={() => void hostAction("start")}
+            >
+              Start clock
+            </Button>
+            <Button
+              variant="secondary"
+              disabled={busy !== null || state.status !== "playing"}
+              onClick={() => void hostAction("pause")}
+            >
+              Pause
+            </Button>
+            <Button
+              variant="secondary"
+              disabled={busy !== null || state.status !== "paused"}
+              onClick={() => void hostAction("resume")}
+            >
+              Resume
+            </Button>
+            <Button
+              variant="destructive"
+              disabled={busy !== null || inLobby}
+              onClick={() => void hostAction("end-game")}
+            >
+              End now / freeze
+            </Button>
+          </div>
+          {state.status !== "lobby" ? (
+            <TimerBar
+              remainingMs={remaining}
+              totalMs={state.config.timeLimitSeconds * 1000}
+              paused={state.paused}
+              label={state.frozen ? "Frozen — final leaderboard" : "Round clock"}
+            />
+          ) : null}
+        </CardContent>
+      </Card>
+
       <div className="grid gap-4 lg:grid-cols-[1.2fr_0.8fr]">
         <Card>
           <CardHeader>
-            <CardTitle>Question controls</CardTitle>
+            <CardTitle>Question grid</CardTitle>
             <CardDescription>
-              Open a question so the class moves together. Each group may lock in once. Multipliers
-              are visible on the player board before anyone bets.
+              Every cell shows its multiplier. Counts are how many groups have locked that item.
             </CardDescription>
           </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="flex flex-wrap gap-2">
-              <Button
-                disabled={busy !== null || state.players.length < 1}
-                onClick={() => void hostAction("start", { questionId: 1 })}
-              >
-                Start game
-              </Button>
-              <Button
-                variant="secondary"
-                disabled={busy !== null || current?.phase !== "choosing" || state.status !== "playing"}
-                onClick={() => void hostAction("pause")}
-              >
-                Pause
-              </Button>
-              <Button
-                variant="secondary"
-                disabled={busy !== null || state.status !== "paused"}
-                onClick={() => void hostAction("resume")}
-              >
-                Resume
-              </Button>
-              <Button
-                disabled={busy !== null || current?.phase !== "choosing"}
-                onClick={() => void hostAction("reveal")}
-              >
-                Reveal / lock
-              </Button>
-              <Button
-                variant="secondary"
-                disabled={busy !== null || state.status === "lobby"}
-                onClick={() => void hostAction("next")}
-              >
-                Next question
-              </Button>
-              <Button variant="destructive" disabled={busy !== null} onClick={() => void hostAction("end-game")}>
-                End game
-              </Button>
-            </div>
-            <div className="flex flex-wrap items-end gap-2">
-              <div className="grid gap-2">
-                <Label htmlFor="decision-seconds">Decision time (seconds)</Label>
-                <Input
-                  id="decision-seconds"
-                  className="w-28"
-                  value={seconds}
-                  onChange={(event) => setSeconds(event.target.value)}
-                />
-              </div>
-              <Button
-                variant="outline"
-                disabled={busy !== null}
-                onClick={() =>
-                  void hostAction("update-config", {
-                    config: { decisionTimeSeconds: Number(seconds) || 180 },
-                  })
-                }
-              >
-                Save timing
-              </Button>
-            </div>
-
-            {current ? (
-              <div className="space-y-3 rounded-lg border border-amber-300/30 bg-amber-200/5 p-4">
-                <QuestionPrompt question={current} />
-                {current.phase === "choosing" ? (
-                  <TimerBar
-                    remainingMs={remaining}
-                    totalMs={state.config.decisionTimeSeconds * 1000}
-                    paused={current.paused}
-                    label="Time to lock in"
-                  />
-                ) : null}
-                <p className="text-sm text-muted-foreground">
-                  {current.submittedCount} group{current.submittedCount === 1 ? "" : "s"} locked in.
-                  {current.revealed ? ` Key: ${current.revealed.correctKey}` : " Key hidden from students until reveal."}
-                </p>
-              </div>
-            ) : (
-              <p className="text-sm text-muted-foreground">
-                No question is open. Start the game or pick one from the bank.
-              </p>
-            )}
+          <CardContent>
+            <QuestionGrid items={state.grid} showHostCounts />
           </CardContent>
         </Card>
-
         <div className="space-y-4">
-          <BettingLeaderboard rows={state.leaderboard} />
+          <BettingLeaderboard
+            rows={state.leaderboard}
+            title={state.frozen ? "Final leaderboard" : "Live leaderboard"}
+          />
           <Card>
             <CardHeader>
               <CardTitle>Give or take points</CardTitle>
-              <CardDescription>Signed amount: +500 gives, −500 takes. Logged below.</CardDescription>
+              <CardDescription>Signed amount: +500 gives, −500 takes.</CardDescription>
             </CardHeader>
             <CardContent className="space-y-3">
               <div className="grid gap-2">
@@ -359,26 +378,6 @@ function HostDesk(props: {
 
       <Card>
         <CardHeader>
-          <CardTitle>Question bank</CardTitle>
-          <CardDescription>
-            Click a row to open that question for the class. The amber chip is the multiplier
-            students see before they bet.
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <QuestionList
-            items={state.catalog}
-            currentId={current?.id}
-            showStatus
-            onPick={(id) =>
-              void hostAction(state.status === "lobby" ? "start" : "open-question", { questionId: id })
-            }
-          />
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardHeader>
           <CardTitle>Groups</CardTitle>
         </CardHeader>
         <CardContent className="flex flex-wrap items-end gap-3">
@@ -396,7 +395,7 @@ function HostDesk(props: {
           <p className="text-sm text-muted-foreground">
             {state.players.length === 0
               ? "No groups yet."
-              : state.players.map((player) => player.name).join(", ")}
+              : state.players.map((player) => `${player.name} (${player.answeredCount}/15)`).join(", ")}
           </p>
         </CardContent>
       </Card>

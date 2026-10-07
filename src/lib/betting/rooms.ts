@@ -1,52 +1,40 @@
 import { GameError } from "@/lib/game";
 import { isAnswerCorrect, type PlayerAnswer } from "./grade";
 import { applyPayout, clampBalance, clampBet, MAX_BET, STARTING_BALANCE } from "./payout";
-import {
-  formatAnswerKey,
-  getQuestion,
-  publicQuestionCatalog,
-  QUESTIONS,
-  toPublicQuestion,
-} from "./questions";
+import { formatAnswerKey, getQuestion, publicQuestionCatalog } from "./questions";
 import {
   DEFAULT_BETTING_CONFIG,
   type BalanceLogEntry,
   type BettingConfig,
   type BettingEvent,
   type BettingRoom,
-  type InternalQuestionRound,
-  type PlayerQuestionResult,
+  type GradedSubmission,
   type PlayerRecord,
   type PublicBettingState,
-  type PublicQuestionListItem,
+  type PublicYourResult,
 } from "./types";
 
 const globalStore = globalThis as unknown as {
   bettingRooms?: Map<string, BettingRoom>;
-  bettingPractice?: Map<string, PracticeAttempt>;
+  bettingPractice?: Map<string, PracticeSession>;
 };
 
 export const rooms: Map<string, BettingRoom> =
   globalStore.bettingRooms ?? new Map<string, BettingRoom>();
 globalStore.bettingRooms = rooms;
 
-type PracticeAttempt = {
+type PracticeResult = PublicYourResult & { balanceAfter: number };
+
+type PracticeSession = {
   id: string;
   createdAt: number;
-  questionId: number;
   balance: number;
-  resolved: {
-    correct: boolean;
-    bet: number;
-    delta: number;
-    balanceAfter: number;
-    correctKey: string;
-  } | null;
+  results: Map<number, PracticeResult>;
 };
 
-export const practiceAttempts: Map<string, PracticeAttempt> =
-  globalStore.bettingPractice ?? new Map<string, PracticeAttempt>();
-globalStore.bettingPractice = practiceAttempts;
+export const practiceSessions: Map<string, PracticeSession> =
+  globalStore.bettingPractice ?? new Map<string, PracticeSession>();
+globalStore.bettingPractice = practiceSessions;
 
 const ROOM_CODE_CHARS = "ACDEGHJKLMNPQRTUVWXY3479";
 
@@ -78,6 +66,10 @@ function remainingMs(
   return Math.max(0, new Date(deadline).getTime() - Date.now());
 }
 
+function submissionKey(playerId: string, questionId: number): string {
+  return `${playerId}:${questionId}`;
+}
+
 export function emit(room: BettingRoom, event: BettingEvent): void {
   for (const listener of room.listeners) {
     listener(event);
@@ -97,12 +89,12 @@ function broadcastState(room: BettingRoom): void {
   emit(room, { type: "round:state", payload: null });
 }
 
-export function normalizeConfig(config: BettingConfig): BettingConfig {
+export function normalizeConfig(config: BettingConfig & { decisionTimeSeconds?: number }): BettingConfig {
+  const seconds = config.timeLimitSeconds ?? config.decisionTimeSeconds ?? DEFAULT_BETTING_CONFIG.timeLimitSeconds;
   return {
-    decisionTimeSeconds: clampInt(config.decisionTimeSeconds, 15, 900),
+    timeLimitSeconds: clampInt(seconds, 30, 3600),
     startingBalance: STARTING_BALANCE,
     maxBet: MAX_BET,
-    resultsDurationSeconds: clampInt(config.resultsDurationSeconds, 10, 180),
   };
 }
 
@@ -113,7 +105,7 @@ function clampInt(value: number, min: number, max: number): number {
 
 export function createRoom(options: {
   hostName: string;
-  config?: Partial<BettingConfig>;
+  config?: Partial<BettingConfig> & { decisionTimeSeconds?: number };
 }): { room: BettingRoom; hostId: string; hostToken: string } {
   let code = randomCode();
   while (rooms.has(code)) {
@@ -129,9 +121,10 @@ export function createRoom(options: {
     config: normalizeConfig({ ...DEFAULT_BETTING_CONFIG, ...options.config }),
     status: "lobby",
     players: new Map(),
-    current: null,
-    answeredQuestionIds: [],
+    startedAt: null,
+    deadline: null,
     pauseRemainingMs: null,
+    submissions: new Map(),
     balanceLog: [],
     listeners: new Set(),
   };
@@ -204,108 +197,110 @@ export function joinRoom(options: {
 export function updateConfig(
   room: BettingRoom,
   hostToken: string,
-  patch: Partial<BettingConfig>
+  patch: Partial<BettingConfig> & { decisionTimeSeconds?: number }
 ): BettingConfig {
   assertHost(room, hostToken);
   const next = normalizeConfig({ ...room.config, ...patch });
-  if ((room.status === "playing" || room.status === "paused") && room.current?.phase === "choosing") {
+  if (room.status === "lobby") {
     room.config = next;
-    const remaining = remainingMs(room.current.deadline, room.status === "paused", room.pauseRemainingMs);
-    room.current.deadline = new Date(Date.now() + remaining).toISOString();
     broadcastState(room);
     return room.config;
   }
-  room.config = next;
-  broadcastState(room);
-  return room.config;
-}
-
-function openQuestion(room: BettingRoom, questionId: number): InternalQuestionRound {
-  getQuestion(questionId);
-  const startedAt = nowIso();
-  const deadline = new Date(Date.now() + room.config.decisionTimeSeconds * 1000).toISOString();
-  return {
-    questionId,
-    phase: "choosing",
-    startedAt,
-    deadline,
-    resultsUntil: null,
-    submissions: new Map(),
-    revealed: null,
-  };
-}
-
-function nextUnansweredId(room: BettingRoom): number | null {
-  const answered = new Set(room.answeredQuestionIds);
-  if (room.current && room.current.phase === "revealed") {
-    answered.add(room.current.questionId);
+  if (room.status === "paused") {
+    room.config = next;
+    room.pauseRemainingMs = next.timeLimitSeconds * 1000;
+    broadcastState(room);
+    return room.config;
   }
-  const found = QUESTIONS.find((question) => !answered.has(question.id));
-  return found?.id ?? null;
+  throw new GameError("Pause or return to the lobby before changing the time limit.", 409);
 }
 
-export function startGame(room: BettingRoom, hostToken: string, questionId?: number): void {
+function answeredCount(room: BettingRoom, playerId: string): number {
+  let count = 0;
+  for (const submission of room.submissions.values()) {
+    if (submission.playerId === playerId) count += 1;
+  }
+  return count;
+}
+
+export function startGame(room: BettingRoom, hostToken: string): void {
   assertHost(room, hostToken);
   if (room.players.size < 1) {
     throw new GameError("Wait for at least one group to join before starting.", 400);
   }
-  const id = questionId ?? 1;
+  if (room.status === "finished") {
+    throw new GameError("This round already ended.", 409);
+  }
+  if (room.status === "playing") {
+    return;
+  }
   room.status = "playing";
   room.pauseRemainingMs = null;
-  room.current = openQuestion(room, id);
+  room.startedAt = nowIso();
+  room.deadline = new Date(Date.now() + room.config.timeLimitSeconds * 1000).toISOString();
   broadcastState(room);
 }
 
 export function pauseGame(room: BettingRoom, hostToken: string): void {
   assertHost(room, hostToken);
-  if (room.status !== "playing" || !room.current || room.current.phase !== "choosing") {
+  if (room.status !== "playing") {
     throw new GameError("Nothing is in play to pause.", 409);
   }
   room.status = "paused";
-  room.pauseRemainingMs = remainingMs(room.current.deadline, false, null);
+  room.pauseRemainingMs = remainingMs(room.deadline, false, null);
   broadcastState(room);
 }
 
 export function resumeGame(room: BettingRoom, hostToken: string): void {
   assertHost(room, hostToken);
-  if (room.status !== "paused" || !room.current) {
-    throw new GameError("The game is not paused.", 409);
+  if (room.status !== "paused") {
+    throw new GameError("The clock is not paused.", 409);
   }
+  const leftover = room.pauseRemainingMs ?? remainingMs(room.deadline, true, room.pauseRemainingMs);
   room.status = "playing";
-  const leftover = room.pauseRemainingMs ?? remainingMs(room.current.deadline, true, room.pauseRemainingMs);
-  room.current.deadline = new Date(Date.now() + leftover).toISOString();
+  room.deadline = new Date(Date.now() + leftover).toISOString();
   room.pauseRemainingMs = null;
   broadcastState(room);
 }
 
-function alreadyAnswered(room: BettingRoom, playerId: string, questionId: number): boolean {
-  if (room.answeredQuestionIds.includes(questionId) && room.current?.questionId !== questionId) {
-    return true;
-  }
-  const current = room.current;
-  if (!current || current.questionId !== questionId) return false;
-  if (current.phase === "revealed") {
-    return current.revealed?.results.some((row) => row.playerId === playerId && !row.missed) ?? false;
-  }
-  return Boolean(current.submissions.get(playerId)?.confirmed);
+function freezeRoom(room: BettingRoom): void {
+  if (room.status === "finished") return;
+  room.status = "finished";
+  room.pauseRemainingMs = 0;
+  room.deadline = nowIso();
+  emit(room, { type: "round:locked", payload: null });
+  broadcastState(room);
+}
+
+export function endGame(room: BettingRoom, hostToken: string): void {
+  assertHost(room, hostToken);
+  freezeRoom(room);
 }
 
 export function submitAnswer(options: {
   room: BettingRoom;
   playerId: string;
   token: string;
+  questionId: number;
   bet: number;
   answer: PlayerAnswer;
-  confirm?: boolean;
-}): void {
+}): GradedSubmission {
   const { room } = options;
   const player = assertPlayer(room, options.playerId, options.token);
-  const current = room.current;
-  if (!current || current.phase !== "choosing" || room.status === "paused") {
-    throw new GameError("Submissions are locked right now.", 409);
+  if (room.status === "paused") {
+    throw new GameError("The host paused the clock. Wait for resume.", 409);
   }
-  if (alreadyAnswered(room, player.id, current.questionId)) {
-    throw new GameError("This group already locked in on this question.", 409);
+  if (room.status !== "playing") {
+    throw new GameError("The round is not open for bets.", 409);
+  }
+  if (remainingMs(room.deadline, false, null) <= 0) {
+    freezeRoom(room);
+    throw new GameError("Time is up. Balances are frozen.", 409);
+  }
+  const question = getQuestion(options.questionId);
+  const key = submissionKey(player.id, question.id);
+  if (room.submissions.has(key)) {
+    throw new GameError("This group already locked in on that question.", 409);
   }
   let bet: number;
   try {
@@ -313,97 +308,24 @@ export function submitAnswer(options: {
   } catch (error) {
     throw new GameError(error instanceof Error ? error.message : "Invalid bet.", 400);
   }
-  current.submissions.set(player.id, {
+  const correct = isAnswerCorrect(question, options.answer);
+  const payout = applyPayout(player.balance, bet, question.multiplier, correct);
+  player.balance = clampBalance(payout.nextBalance);
+  const graded: GradedSubmission = {
     playerId: player.id,
+    questionId: question.id,
     bet,
     answer: options.answer,
+    correct,
+    delta: payout.delta,
+    balanceAfter: player.balance,
     submittedAt: nowIso(),
-    confirmed: options.confirm !== false,
-  });
-  broadcastState(room);
-}
-
-function settleCurrent(room: BettingRoom): void {
-  const current = room.current;
-  if (!current || current.phase === "revealed") return;
-  const question = getQuestion(current.questionId);
-  const results: PlayerQuestionResult[] = [];
-  for (const player of room.players.values()) {
-    const submission = current.submissions.get(player.id);
-    if (!submission?.confirmed) {
-      results.push({
-        playerId: player.id,
-        name: player.name,
-        bet: 0,
-        correct: false,
-        delta: 0,
-        balanceAfter: player.balance,
-        missed: true,
-      });
-      continue;
-    }
-    const correct = isAnswerCorrect(question, submission.answer);
-    const payout = applyPayout(player.balance, submission.bet, question.multiplier, correct);
-    player.balance = clampBalance(payout.nextBalance);
-    results.push({
-      playerId: player.id,
-      name: player.name,
-      bet: submission.bet,
-      correct,
-      delta: payout.delta,
-      balanceAfter: player.balance,
-      missed: false,
-    });
-  }
-  current.phase = "revealed";
-  current.revealed = {
     correctKey: formatAnswerKey(question),
-    results,
   };
-  current.resultsUntil = new Date(Date.now() + room.config.resultsDurationSeconds * 1000).toISOString();
-  if (!room.answeredQuestionIds.includes(current.questionId)) {
-    room.answeredQuestionIds.push(current.questionId);
-  }
-}
-
-export function revealQuestion(room: BettingRoom, hostToken?: string): void {
-  if (hostToken) assertHost(room, hostToken);
-  if (!room.current || room.current.phase !== "choosing") {
-    throw new GameError("There is no open question to reveal.", 409);
-  }
-  settleCurrent(room);
-  room.status = "playing";
-  room.pauseRemainingMs = null;
-  emit(room, { type: "round:resolved", payload: null });
+  room.submissions.set(key, graded);
+  emit(room, { type: "game:leaderboard", payload: null });
   broadcastState(room);
-}
-
-export function nextQuestion(room: BettingRoom, hostToken: string, questionId?: number): void {
-  assertHost(room, hostToken);
-  if (room.current?.phase === "choosing") {
-    settleCurrent(room);
-  }
-  const id = questionId ?? nextUnansweredId(room);
-  if (id === null) {
-    room.status = "finished";
-    room.current = null;
-    broadcastState(room);
-    return;
-  }
-  room.status = "playing";
-  room.pauseRemainingMs = null;
-  room.current = openQuestion(room, id);
-  broadcastState(room);
-}
-
-export function endGame(room: BettingRoom, hostToken: string): void {
-  assertHost(room, hostToken);
-  if (room.current?.phase === "choosing") {
-    settleCurrent(room);
-  }
-  room.status = "finished";
-  room.pauseRemainingMs = null;
-  broadcastState(room);
+  return graded;
 }
 
 export function adjustBalance(options: {
@@ -437,22 +359,30 @@ export function adjustBalance(options: {
   return entry;
 }
 
-function catalogFor(room: BettingRoom): PublicQuestionListItem[] {
-  const currentId = room.current?.questionId ?? null;
-  const revealed = new Set(room.answeredQuestionIds);
-  return publicQuestionCatalog().map((item) => {
-    let status: PublicQuestionListItem["status"] = "upcoming";
-    if (currentId === item.id && room.current?.phase === "choosing") status = "current";
-    else if (currentId === item.id && room.current?.phase === "revealed") status = "revealed";
-    else if (revealed.has(item.id)) status = "revealed";
-    return { ...item, status };
-  });
-}
-
 function leaderboard(room: BettingRoom) {
   return [...room.players.values()]
-    .map((player) => ({ id: player.id, name: player.name, balance: player.balance }))
+    .map((player) => ({
+      id: player.id,
+      name: player.name,
+      balance: player.balance,
+      answeredCount: answeredCount(room, player.id),
+    }))
     .sort((a, b) => b.balance - a.balance || a.name.localeCompare(b.name));
+}
+
+function resultsFor(room: BettingRoom, playerId: string): PublicYourResult[] {
+  const rows: PublicYourResult[] = [];
+  for (const submission of room.submissions.values()) {
+    if (submission.playerId !== playerId) continue;
+    rows.push({
+      questionId: submission.questionId,
+      bet: submission.bet,
+      correct: submission.correct,
+      delta: submission.delta,
+      correctKey: submission.correctKey,
+    });
+  }
+  return rows.sort((a, b) => a.questionId - b.questionId);
 }
 
 export function toPublicState(options: {
@@ -472,25 +402,15 @@ export function toPublicState(options: {
       player.connected = true;
     }
   }
-  const current = room.current;
   const paused = room.status === "paused";
-  const showReveal = current?.phase === "revealed" && current.revealed !== null;
-  const publicCurrent = current
-    ? {
-        ...toPublicQuestion(getQuestion(current.questionId)),
-        phase: current.phase,
-        deadline: paused ? null : current.phase === "revealed" ? current.resultsUntil : current.deadline,
-        remainingMs:
-          current.phase === "revealed"
-            ? remainingMs(current.resultsUntil, false, null)
-            : remainingMs(current.deadline, paused, room.pauseRemainingMs),
-        paused,
-        submittedCount: [...current.submissions.values()].filter((row) => row.confirmed).length,
-        revealed: showReveal ? current.revealed : null,
-      }
-    : null;
+  const frozen = room.status === "finished";
+  const yourResults = youPlayer ? resultsFor(room, youPlayer.id) : [];
+  const yoursByQuestion = new Map(yourResults.map((row) => [row.questionId, row]));
+  const answeredByCount = new Map<number, number>();
+  for (const submission of room.submissions.values()) {
+    answeredByCount.set(submission.questionId, (answeredByCount.get(submission.questionId) ?? 0) + 1);
+  }
 
-  const youSubmission = youPlayer && current ? current.submissions.get(youPlayer.id) : undefined;
   return {
     code: room.code,
     status: room.status,
@@ -499,8 +419,7 @@ export function toPublicState(options: {
       id: player.id,
       name: player.name,
       connected: player.connected,
-      hasSubmitted: Boolean(current?.submissions.get(player.id)?.confirmed),
-      alreadyAnswered: alreadyAnswered(room, player.id, current?.questionId ?? -1),
+      answeredCount: answeredCount(room, player.id),
       balance: player.balance,
     })),
     you: youPlayer
@@ -508,14 +427,22 @@ export function toPublicState(options: {
           id: youPlayer.id,
           name: youPlayer.name,
           balance: youPlayer.balance,
-          bet: youSubmission?.bet ?? null,
-          confirmed: youSubmission?.confirmed ?? false,
-          alreadyAnswered: alreadyAnswered(room, youPlayer.id, current?.questionId ?? -1),
+          answeredCount: answeredCount(room, youPlayer.id),
+          results: yourResults,
         }
       : null,
     isHost,
-    current: publicCurrent,
-    catalog: catalogFor(room),
+    startedAt: room.startedAt,
+    deadline: paused || frozen ? null : room.deadline,
+    remainingMs: frozen ? 0 : remainingMs(room.deadline, paused, room.pauseRemainingMs),
+    paused,
+    frozen,
+    grid: publicQuestionCatalog().map((item) => ({
+      ...item,
+      answered: yoursByQuestion.has(item.id),
+      yourResult: yoursByQuestion.get(item.id) ?? null,
+      answeredByCount: answeredByCount.get(item.id) ?? 0,
+    })),
     leaderboard: leaderboard(room),
     balanceLog: isHost ? room.balanceLog.slice(0, 20) : [],
     error: null,
@@ -523,15 +450,9 @@ export function toPublicState(options: {
 }
 
 export function tickRoom(room: BettingRoom): void {
-  if (room.status === "paused" || room.status === "lobby" || room.status === "finished") {
-    return;
-  }
-  const current = room.current;
-  if (!current) return;
-  if (current.phase === "choosing" && Date.now() >= new Date(current.deadline).getTime()) {
-    settleCurrent(room);
-    emit(room, { type: "round:resolved", payload: null });
-    broadcastState(room);
+  if (room.status !== "playing") return;
+  if (remainingMs(room.deadline, false, null) <= 0) {
+    freezeRoom(room);
   }
 }
 
@@ -544,70 +465,92 @@ function ensureTicker(): void {
       tickRoom(room);
     }
     const cutoff = Date.now() - 1000 * 60 * 30;
-    for (const [id, attempt] of practiceAttempts) {
-      if (attempt.createdAt < cutoff) practiceAttempts.delete(id);
+    for (const [id, session] of practiceSessions) {
+      if (session.createdAt < cutoff) practiceSessions.delete(id);
     }
   }, 250);
 }
 
 export type PracticeState = {
   practiceId: string;
-  question: ReturnType<typeof toPublicQuestion>;
-  catalog: ReturnType<typeof publicQuestionCatalog>;
   balance: number;
-  resolved: PracticeAttempt["resolved"];
+  catalog: ReturnType<typeof publicQuestionCatalog>;
+  grid: PublicBettingState["grid"];
 };
 
-export function createPractice(questionId = 1): PracticeState {
-  const question = getQuestion(questionId);
+function practiceGrid(session: PracticeSession): PublicBettingState["grid"] {
+  return publicQuestionCatalog().map((item) => {
+    const result = session.results.get(item.id) ?? null;
+    return {
+      ...item,
+      answered: Boolean(result),
+      yourResult: result
+        ? {
+            questionId: result.questionId,
+            bet: result.bet,
+            correct: result.correct,
+            delta: result.delta,
+            correctKey: result.correctKey,
+          }
+        : null,
+      answeredByCount: result ? 1 : 0,
+    };
+  });
+}
+
+export function createPractice(): PracticeState {
   const id = randomId();
-  practiceAttempts.set(id, {
+  const session: PracticeSession = {
     id,
     createdAt: Date.now(),
-    questionId: question.id,
     balance: STARTING_BALANCE,
-    resolved: null,
-  });
+    results: new Map(),
+  };
+  practiceSessions.set(id, session);
   return {
     practiceId: id,
-    question: toPublicQuestion(question),
+    balance: session.balance,
     catalog: publicQuestionCatalog(),
-    balance: STARTING_BALANCE,
-    resolved: null,
+    grid: practiceGrid(session),
   };
 }
 
 export function resolvePractice(options: {
   practiceId: string;
+  questionId: number;
   bet: number;
   answer: PlayerAnswer;
 }): PracticeState {
-  const attempt = practiceAttempts.get(options.practiceId);
-  if (!attempt) {
-    throw new GameError("That practice question expired. Start a new one.", 404);
+  const session = practiceSessions.get(options.practiceId);
+  if (!session) {
+    throw new GameError("That practice session expired. Start a new one.", 404);
   }
-  const question = getQuestion(attempt.questionId);
+  const question = getQuestion(options.questionId);
+  if (session.results.has(question.id)) {
+    throw new GameError("You already locked in on that question.", 409);
+  }
   let bet: number;
   try {
-    bet = clampBet(options.bet, Math.min(attempt.balance, MAX_BET));
+    bet = clampBet(options.bet, Math.min(session.balance, MAX_BET));
   } catch (error) {
     throw new GameError(error instanceof Error ? error.message : "Invalid bet.", 400);
   }
   const correct = isAnswerCorrect(question, options.answer);
-  const payout = applyPayout(attempt.balance, bet, question.multiplier, correct);
-  attempt.balance = clampBalance(payout.nextBalance);
-  attempt.resolved = {
-    correct,
+  const payout = applyPayout(session.balance, bet, question.multiplier, correct);
+  session.balance = clampBalance(payout.nextBalance);
+  session.results.set(question.id, {
+    questionId: question.id,
     bet,
+    correct,
     delta: payout.delta,
-    balanceAfter: attempt.balance,
     correctKey: formatAnswerKey(question),
-  };
+    balanceAfter: session.balance,
+  });
   return {
-    practiceId: attempt.id,
-    question: toPublicQuestion(question),
+    practiceId: session.id,
+    balance: session.balance,
     catalog: publicQuestionCatalog(),
-    balance: attempt.balance,
-    resolved: attempt.resolved,
+    grid: practiceGrid(session),
   };
 }
+

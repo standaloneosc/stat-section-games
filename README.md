@@ -93,21 +93,21 @@ Round 1 is a Walker in the center: Calm LOTP `P(left)=0.19`, `P(center)=0.24`. A
 
 ## Question betting
 
-Fifteen interview questions. Groups start at **10,000**. Before they bet they see the question’s multiplier as a large amber chip (**2x**, **2.5x**, **3x**, **3.5x**, or **4x**) on the player board, practice, host desk, and the question list. Correct: `balance − bet + bet × multiplier`. Wrong: lose the bet. Bet 0 is allowed. Max bet is `min(10,000, balance)`.
+Fifteen interview questions in a **grid**. Each cell shows its multiplier (**2x**–**4x**) before anyone bets. Groups start at **10,000** and may lock in any unanswered item while the host clock runs. One submit per question. Correct: `balance − bet + bet × multiplier`. Wrong: lose the bet. **Final score is the balance when time hits zero.**
 
 ### Host
 
 1. Open **Question betting**, **Create room**, share `/betting/room/CODE`.
-2. Groups join with a team name.
-3. On `/betting/room/CODE/host`, click **Start game** (question 1) or pick any row in the bank (each row shows its multiplier).
-4. **Pause** / **Resume**, **Reveal / lock** to grade and pay out, **Next question**, or **End game**.
-5. **Give or take points**: pick a group, enter a signed amount, apply. The live leaderboard is always on the desk.
+2. On the host desk, set **Time limit (minutes)** (default 15; Demo 2 min / Class 15 min). Save, then **Start clock**.
+3. Groups pick any cell, bet, and lock in. The live leaderboard updates on each payout.
+4. **Pause** / **Resume**, or **End now / freeze** to lock remaining unanswered items and freeze balances.
+5. **Give or take points**: pick a group, enter a signed amount, apply.
 
-Distribution questions use a family dropdown (Bernoulli, Binomial, Geometric, Poisson, Hypergeometric, Uniform discrete, Normal, Exponential) plus only the parameters that family needs.
+Distribution questions use a family dropdown plus only the parameters that family needs.
 
 ### Practice
 
-`/betting/practice` uses a fake 10,000 and the same bank. Multipliers stay visible before lock-in.
+`/betting/practice` is the same grid, untimed, with a fake 10,000.
 
 ## Tests
 

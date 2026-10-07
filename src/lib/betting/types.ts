@@ -1,22 +1,19 @@
 import type { PlayerAnswer } from "./grade";
-import type { Multiplier } from "./payout";
 import type { PublicQuestionInfo } from "./questions";
 
 export type GameStatus = "lobby" | "playing" | "paused" | "finished";
-export type QuestionPhase = "choosing" | "revealed";
 
 export type BettingConfig = {
-  decisionTimeSeconds: number;
+  /** Whole-round clock. Host sets this, then starts. Final score is the balance when it hits zero. */
+  timeLimitSeconds: number;
   startingBalance: number;
   maxBet: number;
-  resultsDurationSeconds: number;
 };
 
 export const DEFAULT_BETTING_CONFIG: BettingConfig = {
-  decisionTimeSeconds: 180,
+  timeLimitSeconds: 900,
   startingBalance: 10_000,
   maxBet: 10_000,
-  resultsDurationSeconds: 60,
 };
 
 export type PlayerRecord = {
@@ -29,37 +26,16 @@ export type PlayerRecord = {
   balance: number;
 };
 
-export type PlayerSubmission = {
+export type GradedSubmission = {
   playerId: string;
+  questionId: number;
   bet: number;
   answer: PlayerAnswer;
-  submittedAt: string;
-  confirmed: boolean;
-};
-
-export type PlayerQuestionResult = {
-  playerId: string;
-  name: string;
-  bet: number;
   correct: boolean;
   delta: number;
   balanceAfter: number;
-  missed: boolean;
-};
-
-export type RevealedQuestion = {
+  submittedAt: string;
   correctKey: string;
-  results: PlayerQuestionResult[];
-};
-
-export type InternalQuestionRound = {
-  questionId: number;
-  phase: QuestionPhase;
-  startedAt: string;
-  deadline: string;
-  resultsUntil: string | null;
-  submissions: Map<string, PlayerSubmission>;
-  revealed: RevealedQuestion | null;
 };
 
 export type BalanceLogEntry = {
@@ -84,9 +60,11 @@ export type BettingRoom = {
   config: BettingConfig;
   status: GameStatus;
   players: Map<string, PlayerRecord>;
-  current: InternalQuestionRound | null;
-  answeredQuestionIds: number[];
+  startedAt: string | null;
+  deadline: string | null;
   pauseRemainingMs: number | null;
+  /** key = `${playerId}:${questionId}` */
+  submissions: Map<string, GradedSubmission>;
   balanceLog: BalanceLogEntry[];
   listeners: Set<(event: BettingEvent) => void>;
 };
@@ -95,31 +73,30 @@ export type PublicPlayer = {
   id: string;
   name: string;
   connected: boolean;
-  hasSubmitted: boolean;
-  alreadyAnswered: boolean;
+  answeredCount: number;
   balance: number;
+};
+
+export type PublicYourResult = {
+  questionId: number;
+  bet: number;
+  correct: boolean;
+  delta: number;
+  correctKey: string;
 };
 
 export type PublicYou = {
   id: string;
   name: string;
   balance: number;
-  bet: number | null;
-  confirmed: boolean;
-  alreadyAnswered: boolean;
+  answeredCount: number;
+  results: PublicYourResult[];
 };
 
-export type PublicCurrentQuestion = PublicQuestionInfo & {
-  phase: QuestionPhase;
-  deadline: string | null;
-  remainingMs: number;
-  paused: boolean;
-  submittedCount: number;
-  revealed: RevealedQuestion | null;
-};
-
-export type PublicQuestionListItem = PublicQuestionInfo & {
-  status: "upcoming" | "current" | "revealed";
+export type PublicGridItem = PublicQuestionInfo & {
+  answered: boolean;
+  yourResult: PublicYourResult | null;
+  answeredByCount: number;
 };
 
 export type PublicBettingState = {
@@ -129,9 +106,13 @@ export type PublicBettingState = {
   players: PublicPlayer[];
   you: PublicYou | null;
   isHost: boolean;
-  current: PublicCurrentQuestion | null;
-  catalog: PublicQuestionListItem[];
-  leaderboard: Array<{ id: string; name: string; balance: number }>;
+  startedAt: string | null;
+  deadline: string | null;
+  remainingMs: number;
+  paused: boolean;
+  frozen: boolean;
+  grid: PublicGridItem[];
+  leaderboard: Array<{ id: string; name: string; balance: number; answeredCount: number }>;
   balanceLog: BalanceLogEntry[];
   error: string | null;
 };

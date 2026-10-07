@@ -2,10 +2,8 @@ import {
   adjustBalance,
   endGame,
   getRoom,
-  nextQuestion,
   pauseGame,
   resumeGame,
-  revealQuestion,
   startGame,
   toPublicState,
   updateConfig,
@@ -32,11 +30,10 @@ export async function POST(
     const body = (await request.json()) as {
       hostToken?: string;
       action?: string;
-      questionId?: number;
       playerId?: string;
       amount?: number;
       note?: string;
-      config?: Partial<BettingConfig>;
+      config?: Partial<BettingConfig> & { decisionTimeSeconds?: number };
     };
     const hostToken =
       body.hostToken ||
@@ -44,22 +41,13 @@ export async function POST(
       "";
     switch (body.action) {
       case "start":
-        startGame(room, hostToken, body.questionId);
+        startGame(room, hostToken);
         break;
       case "pause":
         pauseGame(room, hostToken);
         break;
       case "resume":
         resumeGame(room, hostToken);
-        break;
-      case "reveal":
-        revealQuestion(room, hostToken);
-        break;
-      case "next":
-        nextQuestion(room, hostToken, body.questionId);
-        break;
-      case "open-question":
-        nextQuestion(room, hostToken, body.questionId);
         break;
       case "end-game":
         endGame(room, hostToken);

@@ -11,20 +11,21 @@ export async function POST(request: Request) {
   try {
     const body = (await request.json()) as {
       action?: "new" | "resolve";
-      questionId?: number;
       practiceId?: string;
+      questionId?: number;
       bet?: number;
       answer?: PlayerAnswer;
     };
-    if (body.action === "resolve" || body.practiceId) {
+    if (body.action === "resolve" || (body.practiceId && body.questionId)) {
       const state = resolvePractice({
         practiceId: body.practiceId ?? "",
+        questionId: body.questionId ?? 0,
         bet: body.bet ?? 0,
         answer: body.answer ?? {},
       });
       return Response.json(state, { headers: noStore });
     }
-    return Response.json(createPractice(body.questionId ?? 1), { headers: noStore });
+    return Response.json(createPractice(), { headers: noStore });
   } catch (error) {
     return jsonError(error);
   }

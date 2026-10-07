@@ -19,17 +19,17 @@ export async function POST(
     const body = (await request.json()) as {
       playerId?: string;
       token?: string;
+      questionId?: number;
       bet?: number;
       answer?: PlayerAnswer;
-      confirm?: boolean;
     };
     submitAnswer({
       room,
       playerId: body.playerId ?? "",
       token: body.token ?? "",
+      questionId: body.questionId ?? 0,
       bet: body.bet ?? 0,
       answer: body.answer ?? {},
-      confirm: body.confirm ?? true,
     });
     return Response.json(
       toPublicState({

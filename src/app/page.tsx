@@ -57,8 +57,8 @@ export default function HomePage() {
           <CardHeader>
             <CardTitle>Question betting</CardTitle>
             <CardDescription>
-              Fifteen interview questions. Each group starts at 10,000, sees the multiplier (2x–4x)
-              on the question, then bets. Correct pays bet × multiplier.
+              Fifteen interview questions in a grid. Groups start at 10,000, see each multiplier,
+              and bet on any item before the host clock hits zero.
             </CardDescription>
           </CardHeader>
           <CardContent className="flex flex-wrap gap-2">

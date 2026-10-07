@@ -14,7 +14,9 @@ export function BettingLeaderboard(props: {
     <Card>
       <CardHeader>
         <CardTitle>{props.title ?? "Live leaderboard"}</CardTitle>
-        <CardDescription>Balances, highest first. Updated as soon as a question is revealed or the host adjusts points.</CardDescription>
+        <CardDescription>
+          Balances, highest first. Final score is the balance when the clock hits zero.
+        </CardDescription>
       </CardHeader>
       <CardContent>
         {props.rows.length === 0 ? (
